@@ -92,6 +92,10 @@ public final class CodeEditor {
    * holds the field's editing state ({@link FieldState}), so that an editor that leaves the tree,
    * as the content of a tab that is not active does, comes back with its caret, selection,
    * scroll and undo history: keep one per editor, such as one per tab.
+   *
+   * <p>Positions, those it reports and those the app sets, are indexes into the string as the
+   * editor shows it, in which a carriage return with or without a line feed after it and the
+   * separators U+2028 and U+2029 are each one line feed ({@link El#multiline}).
    */
   public static final class State {
     private final FieldState field = new FieldState();

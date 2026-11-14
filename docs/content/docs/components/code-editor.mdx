@@ -20,6 +20,8 @@ description: A multi-line editor for code with line numbers, highlighting, brack
 
 ## The state
 
+Positions are indexes into the string as the editor shows it, in which a carriage return with or without a line feed after it, U+2028 and U+2029 are each one line feed; the editor hands the app that string at the first edit.
+
 | `CodeEditor.State` | |
 | --- | --- |
 | `caret()`, `anchor()` | Where the caret and the other end of the selection are, for a status line ("Ln 3, Col 9") or completions |
