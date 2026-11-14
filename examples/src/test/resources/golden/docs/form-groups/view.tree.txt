@@ -11,13 +11,14 @@ el 0,0 480x300
               text "Host" 25,71 29x16
               text "*" 56,71 7x16
             el 93,67 346x24
-              el 93,67 233x24
-                text role=textbox label="Host" "localhost" 93,67 233x24
-              el 334,67 105x24
-                el 334,67 25x24
-                  text "Port" 334,71 25x16
-                el 367,67 72x24
-                  text role=textbox label="Port" "5432" 367,67 72x24
+              el 93,67 346x24
+                el 93,67 233x24
+                  text role=textbox label="Host" "localhost" 93,67 233x24
+                el 334,67 105x24
+                  el 334,67 25x24
+                    text "Port" 334,71 25x16
+                  el 367,67 72x24
+                    text role=textbox label="Port" "5432" 367,67 72x24
       el role=separator 25,107 414x1
       el role=group label="Login" 25,124 414x80
         el 25,124 414x16

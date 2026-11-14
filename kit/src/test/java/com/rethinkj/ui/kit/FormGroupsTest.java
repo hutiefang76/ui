@@ -100,7 +100,7 @@ class FormGroupsTest {
   }
 
   @Test
-  void eachFieldOfARowIsNamedAndHasItsOwnErrorAndHelpUnderItsControl() throws IOException {
+  void eachFieldOfARowIsNamedWithItsHelpUnderItsControlAndItsErrorUnderTheRow() throws IOException {
     String dump = dump(new Sheets(Theme.DARK).app(Sheets::formGroups), 820, "");
     String host = line(dump, "#beside-host");
     String port = line(dump, "#beside-port");
@@ -113,8 +113,10 @@ class FormGroupsTest {
     float[] error = rect(dump, "text \"Digits only\"");
     assertEquals(h[0], help[0], dump);
     assertEquals(h[2], help[2], "as wide as its control: " + dump);
-    assertEquals(p[0], error[0], dump);
-    assertEquals(p[2], error[2], dump);
+    // A narrow port's error takes the row's width, not its control's, and lies below the help.
+    assertEquals(h[0], error[0], dump);
+    assertEquals(p[0] + p[2] - h[0], error[2], 1, dump);
+    assertTrue(error[1] >= help[1] + help[3], dump);
     // The port's label stands before its control, in the label's look.
     float[] label = rect(dump, "text \"Port\"");
     assertEquals(p[0] - 8, label[0] + label[2], 1, dump);

@@ -10,15 +10,17 @@ el 0,0 340x340
             text "Host" 16,62 29x16
             text "*" 47,62 7x16
           el 84,58 240x108
-            el 84,58 240x58
-              text #beside-host role=textbox label="Host" "db.example.com" 84,58 240x24
-              text "A name or an address the server answers on" 84,84 240x32
-            el 84,124 105x42
-              el 84,124 25x24
-                text "Port" 84,128 25x16
-              el 117,124 72x42
-                text #beside-port role=textbox label="Port" "54x" 117,124 72x24 invalid error="Digits only"
-                text "Digits only" 117,150 72x16
+            el 84,58 240x90
+              el 84,58 240x58
+                text #beside-host role=textbox label="Host" "db.example.com" 84,58 240x24
+                text "A name or an address the server answers on" 84,84 240x32
+              el 84,124 105x24
+                el 84,124 25x24
+                  text "Port" 84,128 25x16
+                el 117,124 72x24
+                  text #beside-port role=textbox label="Port" "54x" 117,124 72x24 invalid error="Digits only"
+            el 84,150 240x16
+              text "Digits only" 84,150 240x16
         el 16,174 308x24
           el 16,174 60x24
             text "Database" 16,178 57x16

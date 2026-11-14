@@ -25,14 +25,15 @@ el 0,0 440x472
                 text "Host" 21,123 29x16
                 text "*" 52,123 7x16
               el 95,119 324x24
-                el 95,119 202x24
-                  text #host role=textbox label="Host" "localhost" 95,119 202x24
-                el 305,119 114x24
-                  el 305,119 34x24
-                    text "Port" 305,123 25x16
-                    text "*" 332,123 7x16
-                  el 347,119 72x24
-                    text #port role=textbox label="Port" "5432" 347,119 72x24
+                el 95,119 324x24
+                  el 95,119 202x24
+                    text #host role=textbox label="Host" "localhost" 95,119 202x24
+                  el 305,119 114x24
+                    el 305,119 34x24
+                      text "Port" 305,123 25x16
+                      text "*" 332,123 7x16
+                    el 347,119 72x24
+                      text #port role=textbox label="Port" "5432" 347,119 72x24
             el 21,151 398x24
               el 21,151 66x24
                 text "Database" 21,155 57x16
