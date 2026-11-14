@@ -5,6 +5,7 @@ import static com.rethinkj.ui.El.row;
 import static com.rethinkj.ui.kit.Label.label;
 
 import com.rethinkj.ui.App;
+import com.rethinkj.ui.CodeWords;
 import com.rethinkj.ui.Decorator;
 import com.rethinkj.ui.El;
 import com.rethinkj.ui.Key;
@@ -313,8 +314,8 @@ public final class Find {
       if (s < e && oneLine && !found) {
         chosen = text.substring(s, e);
       } else if (s == e && !wasOpen) {
-        int from = Completion.wordStart(text, s);
-        int to = wordEnd(text, s);
+        int from = CodeWords.start(text, s);
+        int to = CodeWords.end(text, s);
         chosen = from < to ? text.substring(from, to) : null;
         origin = from;
       }
@@ -1042,19 +1043,6 @@ public final class Find {
     }
     button.focusable().focusRing(t.accent().edge());
     return Tooltip.tooltip(t, button, tip);
-  }
-
-  /** The end of the word that starts at or before {@code caret}. */
-  static int wordEnd(String text, int caret) {
-    int at = caret;
-    while (at < text.length()) {
-      int c = text.codePointAt(at);
-      if (!Completion.word(c)) {
-        break;
-      }
-      at += Character.charCount(c);
-    }
-    return at;
   }
 
   /** The text as a regular expression that finds it. */
