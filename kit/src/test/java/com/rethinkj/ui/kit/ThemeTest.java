@@ -152,16 +152,27 @@ class ThemeTest {
     });
     check(failures, "bracket", code.operator(), Map.of("bracket", over(line, code.bracket())), 4.5);
     // The matches of a find, the current one, and the occurrences of the word at the caret, also
-    // on the caret's line; under the selection 3:1, as all code.
-    Map<String, Integer> marked = Map.of(
-        "match", over(s.raised(), code.match()),
-        "match on the caret line", over(line, code.match()),
-        "current match", over(s.raised(), code.current()),
-        "current match on the caret line", over(line, code.current()),
-        "occurrence", over(s.raised(), code.occurrence()),
-        "occurrence on the caret line", over(line, code.occurrence()));
-    Map<String, Integer> selectedMatch = Map.of(
-        "selected current match", over(over(line, code.current()), t.accent().selection()));
+    // on the caret's line, in a block and on the caret's line in a block; under the selection 3:1,
+    // as all code.
+    Map<String, Integer> marked = new java.util.HashMap<>();
+    Map<String, Integer> selectedMatch = new java.util.HashMap<>();
+    Map.of(
+            "",
+            s.raised(),
+            " on the caret line",
+            line,
+            " in a block",
+            block,
+            " on the caret line in a block",
+            over(block, code.line()))
+        .forEach((where, under) -> {
+          marked.put("match" + where, over(under, code.match()));
+          marked.put("current match" + where, over(under, code.current()));
+          marked.put("occurrence" + where, over(under, code.occurrence()));
+          selectedMatch.put(
+              "selected current match" + where,
+              over(over(under, code.current()), t.accent().selection()));
+        });
     Map<String, Integer> text = new java.util.HashMap<>(codeColours);
     text.put("text", t.text().primary());
     text.forEach((token, colour) -> {

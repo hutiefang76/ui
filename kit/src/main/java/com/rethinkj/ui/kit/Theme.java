@@ -537,7 +537,7 @@ public record Theme(
         alpha(AMBER_323, 0.376f),
         alpha(AMBER_467, 0.267f),
         alpha(WHITE, 0.03f),
-        alpha(TEAL_490, 0.1f));
+        alpha(mix(BLACK, TEAL_490, 0.08), 0.5f));
 
     /** For light surfaces. */
     public static final Code LIGHT = new Code(
@@ -551,7 +551,7 @@ public record Theme(
         alpha(AMBER_768, 0.25f),
         alpha(AMBER_720, 0.5f),
         alpha(BLACK, 0.11f),
-        alpha(TEAL_490, 0.16f));
+        alpha(TEAL_490, 0.1f));
 
     /**
      * The colours of code with the background of a marked block of {@link #DARK} where the caret's
