@@ -1,0 +1,1 @@
+- `Lane.pending()` no longer lists a piece of work whose computation has ended, in the moment before the lane begins the next, so that after `App.await` it is empty when all work is done.

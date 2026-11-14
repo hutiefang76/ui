@@ -90,7 +90,8 @@ public final class Lane {
    */
   public synchronized List<Work> pending() {
     List<Work> all = new ArrayList<>(waiting.size() + 1);
-    if (current != null) {
+    // Not one that has ended and only waits to hand the lane on: await() may already have returned.
+    if (current != null && current.isRunning()) {
       all.add(current);
     }
     all.addAll(waiting);
