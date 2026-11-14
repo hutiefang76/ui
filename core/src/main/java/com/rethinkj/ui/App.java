@@ -1602,8 +1602,9 @@ public final class App<S> {
    * <p>When a rebuild leaves out the focused element, or it can no longer take the focus (it is
    * no longer focusable, takes no input or is clipped away), the focus does not vanish: it goes to
    * the nearest element along the old element's identity path that is still there, below the
-   * root, and either takes the focus itself or holds an element that does, then to that element,
-   * the first in tree order. This returns that element from the same frame on. Closing the active
+   * root, and either takes the focus itself or holds an element that does, then to that element:
+   * its {@link El#defaultFocus} one, else its {@link El#autofocus} one, else the first in tree
+   * order. This returns that element from the same frame on. Closing the active
    * tab from inside its content puts the focus into the content of the tab that takes over, and an
    * editor laid over a grid's cell gives it back to the grid when it goes. Only when no ancestor
    * below the root holds a focusable element is the focus cleared, and this returns null. The
@@ -1664,7 +1665,8 @@ public final class App<S> {
    *
    * <p>An element that is not focusable, such as a sidebar or the content of a tab, moves the
    * focus into it: to the element inside it that had the focus last, if it can still take it,
-   * else to the first one inside it that can, as the focus finds a place when its element goes.
+   * else to its {@link El#defaultFocus} element, else to the first one inside it that can, as the
+   * focus finds a place when its element goes.
    * The element inside is looked for in the tree built after the handler, so the handler can
    * change what the element holds and focus it at once; when nothing inside can take the focus,
    * the focus stays where it was.
@@ -1712,7 +1714,7 @@ public final class App<S> {
     if (first == null) {
       return null;
     }
-    El entered = enter(first, 1); // in a list, its row that had the focus last
+    El entered = enter(first, 0); // in a list, its row that had the focus last
     if (Animator.isBelow(animator.identity(entered), id)) {
       return entered;
     }
@@ -1933,7 +1935,9 @@ public final class App<S> {
    * Where Tab goes instead of {@code next} when that is in a virtual list and the focus is not: to
    * the element that last had the focus in the list, else to the first focusable element of the
    * first row in view, or the last one of the last row in view for Shift+Tab, rather than to the
-   * first row the list built. The row is built and scrolled into view if needed.
+   * first row the list built. The row is built and scrolled into view if needed. A {@code step} of
+   * 0 focuses into the list as {@link #focus(El)} does: to the element of the row that {@link
+   * #firstInside} picks.
    */
   private El enter(El next, int step) {
     Animator.InRow in = animator.inRow(animator.identity(next));
@@ -1953,13 +1957,20 @@ public final class App<S> {
         return next;
       }
     }
+    El rowEl = list.children().get(row - list.firstRow());
     Set<El> inside = Collections.newSetFromMap(new IdentityHashMap<>());
-    collect(list.children().get(row - list.firstRow()), inside);
+    collect(rowEl, inside);
     List<El> order = focusables();
-    order.removeIf(El::skipsTab); // as for the order outside: the focus is not in the list
+    if (step != 0) {
+      order.removeIf(El::skipsTab); // as for the order outside: the focus is not in the list
+    }
     El again = last == null ? null : animator.element(last);
     if (again != null && inside.contains(again) && order.contains(again)) {
       return again;
+    }
+    if (step == 0) {
+      El chosen = firstInside(rowEl, order);
+      return chosen != null ? chosen : next;
     }
     El found = null;
     for (El el : order) {
@@ -2069,22 +2080,35 @@ public final class App<S> {
   }
 
   /**
-   * The element of {@code order} inside {@code scope} that is {@link El#autofocus}, the first in
-   * tree order, or else the first; null if none is inside.
+   * The element of {@code order} inside {@code scope} that is {@link El#defaultFocus}, the one the
+   * fewest levels below it and the first in tree order among those, else the first that is {@link
+   * El#autofocus}, else the first; null if none is inside.
    */
   private static El firstInside(El scope, List<El> order) {
-    Set<El> inside = Collections.newSetFromMap(new IdentityHashMap<>());
-    collect(scope, inside);
+    Map<El, Integer> inside = new IdentityHashMap<>();
+    depths(scope, 0, inside);
+    El preferred = null;
+    El asking = null;
     El first = null;
     for (El el : order) {
-      if (inside.contains(el)) {
-        if (el.autofocusKey() != null) {
-          return el;
-        }
-        first = first == null ? el : first;
+      Integer depth = inside.get(el);
+      if (depth == null) {
+        continue;
       }
+      if (el.isDefaultFocus() && (preferred == null || depth < inside.get(preferred))) {
+        preferred = el;
+      }
+      asking = asking == null && el.autofocusKey() != null ? el : asking;
+      first = first == null ? el : first;
     }
-    return first;
+    return preferred != null ? preferred : asking != null ? asking : first;
+  }
+
+  private static void depths(El el, int depth, Map<El, Integer> into) {
+    into.put(el, depth);
+    for (El child : el.children()) {
+      depths(child, depth + 1, into);
+    }
   }
 
   /** The first scroll area in tree order inside {@code el} that can move up or down so. */
