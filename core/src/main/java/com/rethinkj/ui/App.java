@@ -250,6 +250,12 @@ public final class App<S> {
   // shortcut: lists that are gone stay in it, one small entry each; drop them in update() when
   // apps create lists by the thousand.
   private final Map<Object, Object> remembered = new HashMap<>();
+  // The identities of the elements that had the focus last, the latest first, for focus(container).
+  // shortcut: the last 16 only; a container whose last focus is older gets its first element.
+  private final ArrayDeque<Object> recent = new ArrayDeque<>();
+  // The state changed outside the app's handlers (invalidate): build the view before the next
+  // input.
+  private boolean changedOutside;
   // The rows each list with an onRowsBuilt handler told last, first and last in one long, by the
   // list's identity, for the lists the last fillRows found; a list that comes back tells again.
   private final Map<Object, Long> toldRows = new HashMap<>();
@@ -1446,11 +1452,13 @@ public final class App<S> {
 
   /**
    * The state changed outside the app's own handlers: the next {@link #frame} builds the view
-   * again, as after a handler. A runner calls it on its other apps of the same state object after a
-   * handler of one ran ({@link #ranHandlers}); it is not input, and wakes nothing by itself.
+   * again, as after a handler, before the input queued for it, which then goes to the new tree. A
+   * runner calls it on its other apps of the same state object after a handler of one ran ({@link
+   * #ranHandlers}); it is not input, and wakes nothing by itself.
    */
   public void invalidate() {
     stale = true;
+    changedOutside = true;
   }
 
   /**
@@ -1654,23 +1662,72 @@ public final class App<S> {
    * of later trees that has the same identity; when there is none, or that element is no longer
    * focusable or takes no input, the focus goes where {@link #focused} says.
    *
-   * @throws IllegalArgumentException if the element is not {@link El#focusable}, not in the last
-   *     frame's tree, or takes no input there: it is leaving, the view made it or an ancestor
+   * <p>An element that is not focusable, such as a sidebar or the content of a tab, moves the
+   * focus into it: to the element inside it that had the focus last, if it can still take it,
+   * else to the first one inside it that can, as the focus finds a place when its element goes.
+   * The element inside is looked for in the tree built after the handler, so the handler can
+   * change what the element holds and focus it at once; when nothing inside can take the focus,
+   * the focus stays where it was.
+   *
+   * @throws IllegalArgumentException if the element is not in the last frame's tree, or is {@link
+   *     El#focusable} and takes no input there: it is leaving, the view made it or an ancestor
    *     invisible with opacity 0, or it is clipped away. An element that fades in can take the
    *     focus from the frame that adds it on.
    */
   public void focus(El el) {
-    if (el != null && !focusables().contains(el)) {
+    if (el != null
+        && !(el.isFocusable()
+            ? focusables().contains(el)
+            : root != null && pathTo(root, el, new ArrayList<>()))) {
       throw new IllegalArgumentException(
-          "This element cannot take the focus: it is not focusable(), not in the last frame's tree"
-              + " or takes no input there");
+          "This element cannot take the focus: it is not in the last frame's tree, or it is"
+              + " focusable() and takes no input there");
     }
     Object id = el == null ? null : animator.identity(el);
+    boolean into = el != null && !el.isFocusable();
     enqueue(() -> {
       settle();
       El now = id == null ? null : animator.element(id);
-      return (id == null || now != null && focusables().contains(now)) && focus(now, true);
+      List<El> order = focusables();
+      if (into) {
+        now = now == null ? null : into(id, now, order);
+        return now != null && focus(now, true);
+      }
+      return (id == null || now != null && order.contains(now)) && focus(now, true);
     });
+  }
+
+  /**
+   * Where {@link #focus(El)} puts the focus inside the element {@code scope} with identity {@code
+   * id}: the element there that had it last and can still take it, else the first that can.
+   */
+  private El into(Object id, El scope, List<El> order) {
+    for (Object last : recent) {
+      El el = Animator.isBelow(last, id) ? animator.element(last) : null;
+      if (el != null && order.contains(el)) {
+        return el;
+      }
+    }
+    El first = firstInside(scope, order);
+    if (first == null) {
+      return null;
+    }
+    El entered = enter(first, 1); // in a list, its row that had the focus last
+    if (Animator.isBelow(animator.identity(entered), id)) {
+      return entered;
+    }
+    return animator.identity(first) != null ? first : null; // enter's new rows may have dropped it
+  }
+
+  /** Puts the focus's identity first in {@link #recent}. */
+  private void noteRecent() {
+    if (!focusId.equals(recent.peekFirst())) {
+      recent.remove(focusId);
+      recent.addFirst(focusId);
+      if (recent.size() > 16) {
+        recent.removeLast();
+      }
+    }
   }
 
   /**
@@ -1812,6 +1869,7 @@ public final class App<S> {
     typeAhead.setLength(0);
     if (el != null) {
       el.focused(true);
+      noteRecent(); // here too: another request of the same frame may move it on before a rebuild
       Animator.InRow in = animator.inRow(focusId);
       if (in != null) {
         remembered.put(in.listId(), focusId);
@@ -1889,7 +1947,7 @@ public final class App<S> {
         ? was.row()
         : list.rowInView(step < 0);
     if (!list.hasRow(row)) {
-      list.scrollTo(list.scrollX(), list.offsetShowing(row));
+      scrolled |= list.scrollTo(list.scrollX(), list.offsetShowing(row));
       fillRows();
       if (!list.hasRow(row)) {
         return next;
@@ -1976,6 +2034,7 @@ public final class App<S> {
     }
     focused = el;
     el.focused(true);
+    noteRecent();
     if (reveal) {
       reveal = false;
       reveal(el);
@@ -2001,22 +2060,31 @@ public final class App<S> {
       if (order.contains(scope)) {
         return scope;
       }
-      Set<El> inside = Collections.newSetFromMap(new IdentityHashMap<>());
-      collect(scope, inside);
-      El first = null;
-      for (El el : order) {
-        if (inside.contains(el)) {
-          if (el.autofocusKey() != null) {
-            return el;
-          }
-          first = first == null ? el : first;
-        }
-      }
+      El first = firstInside(scope, order);
       if (first != null) {
         return first;
       }
     }
     return null;
+  }
+
+  /**
+   * The element of {@code order} inside {@code scope} that is {@link El#autofocus}, the first in
+   * tree order, or else the first; null if none is inside.
+   */
+  private static El firstInside(El scope, List<El> order) {
+    Set<El> inside = Collections.newSetFromMap(new IdentityHashMap<>());
+    collect(scope, inside);
+    El first = null;
+    for (El el : order) {
+      if (inside.contains(el)) {
+        if (el.autofocusKey() != null) {
+          return el;
+        }
+        first = first == null ? el : first;
+      }
+    }
+    return first;
   }
 
   /** The first scroll area in tree order inside {@code el} that can move up or down so. */
@@ -2859,8 +2927,8 @@ public final class App<S> {
     }
     takeDue();
     while (!queued.isEmpty()) {
-      if (handled) { // the next input goes to a tree built from the state as it is now
-        rebuild(true);
+      if (handled || changedOutside) { // the next input goes to a tree built from the state now
+        rebuild(handled); // after invalidate alone with its rows: an action may look for them
         drawn = true;
       }
       dispatching = true;
@@ -2971,6 +3039,7 @@ public final class App<S> {
     stale = false;
     ran |= handled;
     handled = false;
+    changedOutside = false;
     scrolled = false;
     rowsPending = between && (focusId == null || animator.inRow(focusId) == null);
     endPresses(false);
