@@ -61,6 +61,8 @@ class DocsExamplesTest {
       Map.entry("grid", List.of("selected")),
       Map.entry("tags", List.of("added")),
       Map.entry("tags-form", List.of("view")),
+      Map.entry("resize", List.of("wide", "narrow")),
+      Map.entry("theming", List.of("system")),
       Map.entry("customers", List.of("loaded", "invalid", "saved")));
 
   /** An example: its app in a theme and the size of its window for the default script. */
@@ -205,6 +207,26 @@ class DocsExamplesTest {
     editings(all, "editing-pojo", Editings::pojo, 360, 160);
     all.put("tags", new Example(t -> tags(t, Tags::view), 320, 140));
     all.put("tags-form", new Example(t -> tags(t, Tags::form), 400, 160));
+    all.put(
+        "resize",
+        new Example(
+            t -> {
+              Bars state = new Bars();
+              state.t = t;
+              return new App<>(state, Bars::view);
+            },
+            420,
+            100));
+    all.put(
+        "theming",
+        new Example(
+            t -> {
+              Themes state = new Themes();
+              state.systemDark = t == Theme.DARK; // System mode: the system's choice
+              return new App<>(state, Themes::view);
+            },
+            420,
+            200));
     all.put(
         "customers",
         new Example(
