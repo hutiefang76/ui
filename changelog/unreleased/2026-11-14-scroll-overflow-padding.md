@@ -1,0 +1,1 @@
+- A scroll area no longer scrolls, or shows a bar, for a descendant that sticks out into its end padding and no further, such as a checkbox or switch at the end of a dialog's content: as in CSS, only the children get the end padding added, not what sticks out of them.

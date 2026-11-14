@@ -125,8 +125,18 @@ class DialogScrollTest {
         s -> El.col()
             .wFull()
             .hFull()
-            .overlay(
-                Dialog.dialog(t, "Note", El.el().key("body").size(120, 40), List.of(), () -> {})));
+            .overlay(Dialog.dialog(
+                t,
+                "Note",
+                // A checkbox last: its row reaches past the column's end, within the area's room.
+                El.col()
+                    .key("body")
+                    .w(120)
+                    .gap(t.space().m())
+                    .children(
+                        Label.label(t, "First"), Checkbox.checkbox(t, false, "Second", () -> {})),
+                List.of(),
+                () -> {})));
     Script.run("size 360 240\nframe\nadvance 0.25\nframe\nwheel #body 0 50\nframe\n", app, out);
     String dump = app.tree().dump();
     String area = StructureTest.line(dump, "#dialog-content ");
