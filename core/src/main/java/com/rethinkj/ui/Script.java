@@ -678,6 +678,30 @@ public final class Script {
     }
   }
 
+  /**
+   * The {@link Windows.Handle#onClosed} of a closed window, with its app's state: requested in an
+   * open window, and again in another when that one closes first; it runs in the first frame that
+   * comes to it while that window is open.
+   */
+  private static final class Told { // by identity: each close runs once
+    final Desk desk;
+    final Runnable handler;
+    final Object state;
+
+    Told(Desk desk, Runnable handler, Object state) {
+      this.desk = desk;
+      this.handler = handler;
+      this.state = state;
+    }
+
+    /** Runs the handler as a task of {@code in}, unless {@code in} closed or it ran already. */
+    void run(Win in) {
+      if (in.open && desk.told.remove(this)) {
+        handler.run();
+      }
+    }
+  }
+
   /** A window of a script: its app and its place on the script's screen, in physical pixels. */
   private static final class Win implements Windows.Handle {
     final Desk desk;
@@ -693,6 +717,7 @@ public final class Script {
     boolean fresh; // opened since the last frame step
     boolean dropTarget = true;
     Runnable onClose;
+    Runnable onClosed;
 
     Win(Desk desk, App<?> app, String title) {
       this.desk = desk;
@@ -734,8 +759,21 @@ public final class Script {
 
     @Override
     public void close() {
+      if (!open) {
+        return;
+      }
       open = false;
       desk.front.remove(this);
+      if (onClosed != null) {
+        desk.told.add(new Told(desk, onClosed, app.state()));
+      }
+      // Again for those queued in this window's app, which runs them no more.
+      for (Told t : desk.told) {
+        Win heir = desk.heir(t.state);
+        if (heir != null) {
+          heir.app.request(() -> t.run(heir));
+        }
+      }
     }
 
     @Override
@@ -783,6 +821,11 @@ public final class Script {
     }
 
     @Override
+    public void onClosed(Runnable handler) {
+      onClosed = handler;
+    }
+
+    @Override
     public void dropTarget(boolean on) {
       dropTarget = on;
     }
@@ -803,6 +846,7 @@ public final class Script {
   private static final class Desk implements Windows {
     final List<Win> wins = new ArrayList<>(); // in the order they opened
     final List<Win> front = new ArrayList<>(); // front first
+    final List<Told> told = new ArrayList<>(); // onClosed handlers no window has run yet
     final Win first;
     Win chosen;
     Win held; // the window a press began in, until its release
@@ -891,6 +935,15 @@ public final class Script {
 
     List<Win> open() {
       return wins.stream().filter(w -> w.open).toList();
+    }
+
+    /** The open window to run an {@link Handle#onClosed} of {@code state}, or null. */
+    Win heir(Object state) {
+      List<Win> open = open();
+      return open.stream()
+          .filter(w -> w.app.state() == state)
+          .findFirst()
+          .orElse(open.isEmpty() ? null : open.getFirst());
     }
 
     void select(Line line, String name) {

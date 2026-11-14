@@ -42,6 +42,7 @@ class WindowsScriptTest {
     int over = -1; // the slot a drag of the chip is over
     int count;
     boolean veto; // a close request of the chip's window changes nothing
+    int closed; // times the chip's window told that it closed
     Windows.Handle window; // the chip's window
     float grabX; // where the pointer holds the chip
     float grabY;
@@ -108,6 +109,7 @@ class WindowsScriptTest {
             dock(0);
           }
         });
+        window.onClosed(() -> closed++);
         slot = -1;
       } else if (window != null && moving) {
         window.moveTo(
@@ -243,6 +245,7 @@ class WindowsScriptTest {
         """, app, out);
     assertNotNull(b.window);
     assertTrue(Files.exists(out.resolve("chip-vetoed.png")));
+    assertEquals(0, b.closed);
 
     b.veto = false;
     Script.run("""
@@ -253,7 +256,35 @@ class WindowsScriptTest {
         """, app, out.resolve("again"));
     assertNull(b.window);
     assertEquals(0, b.slot, "back in the first slot");
+    assertEquals(1, b.closed, "told once, as a task of the main window");
     assertFalse(Files.exists(out.resolve("again/chip-closed.png")));
+  }
+
+  @Test
+  void aClosedWindowIsToldInAWindowThatStaysOpen() throws IOException {
+    App<Board> app = board();
+    Script.run("size 300 100 scale 2\nframe", app, out);
+    Object other = new Object(); // a state of A and B, not the main window's
+    Windows.Handle a =
+        app.windows().open("A", 60, 60, Window.options(), new App<>(other, s -> el()));
+    Windows.Handle b =
+        app.windows().open("B", 60, 60, Window.options(), new App<>(other, s -> el()));
+    List<String> told = new ArrayList<>();
+    a.onClosed(() -> told.add("A"));
+    b.onClosed(() -> told.add("B"));
+    b.close(); // told in A, of the same state
+    a.close(); // before A's frame: both are told in the main window
+    Script.run("frame", app, out);
+    assertEquals(List.of("B", "A"), told);
+
+    Windows.Handle c =
+        app.windows().open("C", 60, 60, Window.options(), new App<>(other, s -> el()));
+    c.onClosed(() -> told.add("C"));
+    Windows.Handle main = app.windows().of(app);
+    app.request(main::close); // in the main window's next frame, before what C's close queues
+    c.close();
+    Script.run("frame", app, out);
+    assertEquals(List.of("B", "A"), told, "no window stays open to be told of C");
   }
 
   @Test

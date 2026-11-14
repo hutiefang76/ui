@@ -141,6 +141,7 @@ public final class WindowLoop {
   private final List<Entry> entries = new ArrayList<>();
   private final List<Entry> front = new ArrayList<>();
   private final List<Entry> closing = new ArrayList<>();
+  private final List<Told> told = new ArrayList<>(); // onClosed handlers no window has run yet
   private final LoopWindows windows = new LoopWindows();
   private Function<Window, Presenter> presenters;
   private WindowListener listener;
@@ -170,6 +171,7 @@ public final class WindowLoop {
     final Presenter presenter;
     final boolean owned; // opened by the loop, which closes it
     Runnable onClose;
+    Runnable onClosed;
     boolean dropTarget = true;
     // Moved by the app during the press that is down, as a window that follows it, or during the
     // last one: the frame that runs the release still asks where on the screen it was (place).
@@ -219,6 +221,18 @@ public final class WindowLoop {
       }
       open = false;
       front.remove(this);
+      if (running) {
+        if (onClosed != null) {
+          told.add(new Told(onClosed, app.state()));
+        }
+        // Again for those queued in this window's app, which runs them no more.
+        for (Told t : told) {
+          Entry heir = heir(t.state);
+          if (heir != null) {
+            heir.app.post(() -> t.run(heir));
+          }
+        }
+      }
       if (drawing) {
         closing.add(this); // after the pass: its app may be in the middle of a frame
       } else {
@@ -271,6 +285,11 @@ public final class WindowLoop {
     @Override
     public void onCloseRequest(Runnable handler) {
       onClose = handler;
+    }
+
+    @Override
+    public void onClosed(Runnable handler) {
+      onClosed = handler;
     }
 
     @Override
@@ -567,6 +586,7 @@ public final class WindowLoop {
       throw e;
     } finally {
       running = false;
+      told.clear(); // the apps end with the loop
       // Every window and presenter is let go of, also when one of them fails to close.
       List<Throwable> failures = new ArrayList<>();
       for (Entry entry : List.copyOf(entries)) {
@@ -779,6 +799,42 @@ public final class WindowLoop {
       }
     }
     return open;
+  }
+
+  /**
+   * The {@link Windows.Handle#onClosed} of a closed window, with its app's state: posted to an
+   * open window, and again to another when that one closes first; it runs in the first frame that
+   * comes to it while the loop runs and that window is open.
+   */
+  private final class Told {
+    final Runnable handler;
+    final Object state;
+
+    Told(Runnable handler, Object state) {
+      this.handler = handler;
+      this.state = state;
+    }
+
+    /** Runs the handler as a task of {@code in}, unless that closed, the loop stopped or it ran. */
+    void run(Entry in) {
+      if (running && in.isOpen() && told.remove(this)) {
+        handler.run();
+      }
+    }
+  }
+
+  /** The open window to run an {@link Windows.Handle#onClosed} of {@code state}, or null. */
+  private Entry heir(Object state) {
+    Entry first = null;
+    for (Entry e : entries) {
+      if (e.isOpen()) {
+        if (e.app.state() == state) {
+          return e;
+        }
+        first = first == null ? e : first;
+      }
+    }
+    return first;
   }
 
   private void toFront(Entry e) {
