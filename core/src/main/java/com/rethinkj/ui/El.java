@@ -3045,22 +3045,24 @@ public final class El {
     }
     boolean scrolls =
         style.overflowX == Style.Overflow.SCROLL || style.overflowY == Style.Overflow.SCROLL;
-    float[] extent = new float[2]; // right and bottom
+    float[] extent = new float[2]; // right and bottom of the children, with their margins
+    // What sticks out of the children: unlike them it gets no end padding (CSS Overflow 3, 2.2).
+    float[] out = new float[2];
     for (El child : children) {
       if (child.placed && !child.exiting) {
         extent[0] = Math.max(extent[0], child.x + child.width + px(child.style.marginRight));
         extent[1] = Math.max(extent[1], child.y + child.height + px(child.style.marginBottom));
         if (scrolls) {
-          child.overflow(child.x, child.y, extent);
+          child.overflow(child.x, child.y, out);
         }
       }
     }
-    float right = extent[0];
-    float bottom = extent[1];
     // shortcut: padding, border and margin only in pixels, not in percent; measure the layout's
     // content size when percentages need it.
-    double overX = right + px(style.paddingRight) + px(style.borderRight) - width;
-    double overY = bottom + px(style.paddingBottom) + px(style.borderBottom) - height;
+    float right = Math.max(extent[0] + px(style.paddingRight), out[0]);
+    float bottom = Math.max(extent[1] + px(style.paddingBottom), out[1]);
+    double overX = right + px(style.borderRight) - width;
+    double overY = bottom + px(style.borderBottom) - height;
     maxScrollX = style.overflowX == Style.Overflow.SCROLL && overX > 0 ? overX + coverX : 0;
     maxScrollY = style.overflowY == Style.Overflow.SCROLL && overY > 0 ? overY + coverY : 0;
   }
