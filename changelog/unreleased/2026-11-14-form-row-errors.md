@@ -1,0 +1,1 @@
+- In a `Form.row`, the errors of its fields lie under the whole row, as wide as the row, instead of under each control, so that the error of a narrow field such as a port no longer wraps on many lines. Help stays under its control.

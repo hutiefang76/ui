@@ -33,14 +33,14 @@ description: Labelled fields, beside or above them, with help, errors and requir
 
 ## Groups and rows
 
-<Shot src="kit/structure-form-groups-{theme}-2x" alt="Two groups of fields under headings with a divider between them, a host and its port in one row with an error under the port, beside and above their labels" />
+<Shot src="kit/structure-form-groups-{theme}-2x" alt="Two groups of fields under headings with a divider between them, a host and its port in one row with the port's error under the row, beside and above their labels" />
 
 ```java snippet="form-groups"
 ```
 
 With `Labels.BESIDE` the label column is as wide as the widest label in any group, so the controls of all groups start at one x; with `Labels.ABOVE` the groups only structure. Groups lie two steps of spacing further apart than fields (`space().xl()` beside, `xxl()` above), with a divider in the middle of that room where `divided()` asks for one.
 
-In a row, the first field's label stands in the label column and each further one's before its control, `space().m()` after the control before it; with labels above, each field has its label above its control. Each field is as wide as its control, unless it grows, and its help or error lies under its control, as wide, wrapping; the controls stay on the row's first line, so an error under one does not move the other. Where the form is too narrow, the row wraps: a field that goes to the next line keeps its label before its control, at the start of that line, not in the label column.
+In a row, the first field's label stands in the label column and each further one's before its control, `space().m()` after the control before it; with labels above, each field has its label above its control. Each field is as wide as its control, unless it grows, and its help lies under its control, as wide, wrapping. The errors of the row's fields lie under the whole row, one below the other, as wide as the row, so that a narrow field's error does not wrap on many lines; the controls stay on the row's first line, so an error does not move them. Where the form is too narrow, the row wraps: a field that goes to the next line keeps its label before its control, at the start of that line, not in the label column.
 
 <Shot src="kit/structure-form-groups-narrow-{theme}-1x" alt="The same form narrow: the port and its label on a line of their own below the host" />
 

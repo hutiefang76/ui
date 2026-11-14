@@ -60,8 +60,9 @@ import java.util.Objects;
  * {@link Group#divided}. In a {@link Row} each field keeps its label, help, error and marker:
  * beside, the first label stands in the column and each further one before its control; above,
  * each above its control. Each field is as wide as its control, or takes the room left with
- * {@link Field#grow}, and what is said below it is as wide as its control; the controls stay on
- * the row's first line. Where the form is too narrow the row wraps, and a field on a further line
+ * {@link Field#grow}, and its help below it is as wide as its control; the errors of a row's
+ * fields lie below the whole row, as wide, one below the other; the controls stay on the row's
+ * first line. Where the form is too narrow the row wraps, and a field on a further line
  * keeps its label before its control.
  */
 public final class Form {
@@ -310,22 +311,28 @@ public final class Form {
 
   /**
    * Fields side by side in a row that wraps where the form is too narrow, each as wide as its
-   * control and its help and error below it as wide; beside, the first field's label in the
-   * column and each further one's before its control.
+   * control and its help below it as wide, the errors below the whole row; beside, the first
+   * field's label in the column and each further one's before its control.
    */
   private static El row(Theme t, Labels labels, float column, Row row) {
     boolean beside = labels == Labels.BESIDE;
     El line = El.row().wrap().align(Style.Align.START);
     line.style().columnGap = Len.px(t.space().m());
     line.style().rowGap = Len.px(beside ? t.space().m() : t.space().l());
+    El errors = col().gap(t.space().xs());
     for (int i = 0; i < row.fields().size(); i++) {
       Field field = row.fields().get(i);
-      El box = body(t, field);
-      if (box.children().size() > 1) {
-        // What is said below takes no width of its own: it wraps at the control's.
-        El below = box.children().get(1).w(0);
-        below.style().minWidth = Len.percent(1);
+      String error = error(t, field);
+      // An error takes the row's width: under a narrow control, as a port, it wraps on many lines.
+      El help = error == null ? said(t, field.help(), false) : null;
+      if (help != null) {
+        // Help takes no width of its own: it wraps at the control's.
+        help.w(0).style().minWidth = Len.percent(1);
       }
+      if (error != null) {
+        errors.child(said(t, error, true));
+      }
+      El box = body(t, field, help);
       El item = box;
       if (!beside) {
         item = col().gap(t.space().xs()).children(head(t, field), box);
@@ -344,12 +351,17 @@ public final class Form {
       }
       line.child(item);
     }
-    if (!beside) {
-      return line;
+    // Always in a column, so that the fields keep their identity, and focus, when an error comes.
+    El fields = col().gap(t.space().xs()).child(line);
+    if (!errors.children().isEmpty()) {
+      fields.child(errors);
     }
-    line.grow(1).style().minWidth = Len.ZERO;
+    if (!beside) {
+      return fields;
+    }
+    fields.grow(1).style().minWidth = Len.ZERO;
     El head = head(t, row.fields().getFirst()).h(t.size().control()).w(column).shrink(0);
-    return El.row().gap(t.space().m()).children(head, line);
+    return El.row().gap(t.space().m()).children(head, fields);
   }
 
   /**
@@ -357,19 +369,40 @@ public final class Form {
    * marks it invalid while there is an error.
    */
   private static El body(Theme t, Field field) {
-    El target = target(field.control());
-    named(field.control(), field.label());
-    // The app's error, else the message of a typed field's text ({@link ValueField}).
-    String error = field.error() != null || target == null ? field.error() : target.errorMessage();
-    invalid(t, target, error);
+    String error = error(t, field);
+    return body(t, field, error != null ? said(t, error, true) : said(t, field.help(), false));
+  }
+
+  /** A field's control with {@code below} under it; null for nothing. */
+  private static El body(Theme t, Field field, El below) {
     El body = col().gap(t.space().xs()).child(field.control().alignSelf(Style.Align.START));
-    String below = error != null ? error : field.help();
     if (below != null) {
-      body.child(label(t, Label.Variant.MUTED, below)
-          .wrapText()
-          .color(error != null ? t.status().danger() : t.text().muted()));
+      body.child(below);
     }
     return body;
+  }
+
+  /**
+   * Names a field's control after its label and marks it invalid while there is an error.
+   *
+   * @return the app's error, else the message of a typed field's text ({@link ValueField}); null
+   *     for none
+   */
+  private static String error(Theme t, Field field) {
+    El target = target(field.control());
+    named(field.control(), field.label());
+    String error = field.error() != null || target == null ? field.error() : target.errorMessage();
+    invalid(t, target, error);
+    return error;
+  }
+
+  /** Text below a control that wraps: muted, or an error in the danger colour; null for none. */
+  private static El said(Theme t, String text, boolean error) {
+    return text == null
+        ? null
+        : label(t, Label.Variant.MUTED, text)
+            .wrapText()
+            .color(error ? t.status().danger() : t.text().muted());
   }
 
   /**
