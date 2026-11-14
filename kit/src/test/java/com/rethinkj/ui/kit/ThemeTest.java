@@ -111,15 +111,19 @@ class ThemeTest {
           check(failures, "spinner ring", ring, Map.of(on, background), 1.3);
           check(failures, "spinner arc", t.accent().edge(), Map.of("its ring on " + on, ring), 3);
         });
-    // Code in an editor: on the field's raised surface, hovered and on the caret's line; the
-    // brackets at the caret on their background too, and every colour 3:1 under the selection.
+    // Code in an editor: on the field's raised surface, hovered, on the caret's line and in a
+    // marked block, with the caret's line over it; the brackets at the caret on their background
+    // too, and every colour 3:1 under the selection.
     Theme.Code code = t.code();
     int line = over(s.raised(), code.line());
+    int block = over(s.raised(), code.block());
     Map<String, Integer> field = Map.of(
         "raised", s.raised(),
         "raised hovered", over(s.raised(), s.hover()),
         "caret line", line,
-        "caret line hovered", over(over(s.raised(), s.hover()), code.line()));
+        "caret line hovered", over(over(s.raised(), s.hover()), code.line()),
+        "block", block,
+        "caret line in block", over(block, code.line()));
     Map<String, Integer> codeColours = Map.of(
         "keyword",
         code.keyword(),
@@ -141,7 +145,9 @@ class ThemeTest {
               "selection",
               over(s.raised(), t.accent().selection()),
               "selection on the caret line",
-              over(line, t.accent().selection())),
+              over(line, t.accent().selection()),
+              "selection in a block",
+              over(block, t.accent().selection())),
           3);
     });
     check(failures, "bracket", code.operator(), Map.of("bracket", over(line, code.bracket())), 4.5);
