@@ -209,8 +209,9 @@ final class FetchNatives {
           .append(platform)
           .append(", in load order.\n")
           .append("# library <name> <version> <file> <sha256>\n")
-          .append("# needs <name> [<library> ...]: loading it loads only these first, not all before"
-              + " it\n");
+          .append(
+              "# needs <name> [<library> ...]: loading it loads only these first, not all before"
+                  + " it\n");
       if (libraries.stream().anyMatch(Library::built)) {
         manifest.append("# built <name> <sha256 of the source archive>: built from source by the"
             + " machine that wrote\n# this file, so the library's own hash is pinned nowhere.\n");
