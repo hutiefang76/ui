@@ -92,6 +92,33 @@ class NativesTest {
   }
 
   @Test
+  void loadsALibraryAfterWhatItNeedsOrElseAfterAllBeforeIt() {
+    String c = "c".repeat(64);
+    Manifest manifest = Manifest.parse(
+        HEADER
+            + "library freetype 2 freetype.dll " + A + "\n"
+            + "library harfbuzz 15 harfbuzz.dll " + B + "\n"
+            + "needs harfbuzz freetype\n"
+            + "library sdl3 3 SDL3.dll " + c + "\n"
+            + "needs sdl3\n"
+            + "library wgpu_native 29 wgpu_native.dll " + A.replace('a', 'd') + "\n",
+        "test");
+    assertEquals(List.of("sdl3"), names(manifest.loadOrder("sdl3")));
+    assertEquals(List.of("freetype", "harfbuzz"), names(manifest.loadOrder("harfbuzz")));
+    assertEquals( // no needs line: everything before it, and what those need
+        List.of("freetype", "harfbuzz", "sdl3", "wgpu_native"),
+        names(manifest.loadOrder("wgpu_native")));
+    assertMessage(
+        () -> Manifest.parse(
+            HEADER + "library a 1 a.dll " + A + "\nneeds a b\nlibrary b 1 b.dll " + B, "m"),
+        "line 4: expected 'needs <name> [<library> ...]' once");
+  }
+
+  private static List<String> names(List<Library> libraries) {
+    return libraries.stream().map(Library::name).toList();
+  }
+
+  @Test
   void rejectsManifestsItCannotRead() {
     assertMessage(
         () -> Manifest.parse("rethinkj-ui-natives 2\nplatform windows-x64\n", "m"),

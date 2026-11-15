@@ -24,11 +24,11 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
-import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 /**
@@ -87,7 +87,10 @@ public final class Natives {
   private final Path cache;
   private final ClassLoader resources;
 
-  private final Map<String, SymbolLookup> loaded = new HashMap<>();
+  private final Map<String, SymbolLookup> loaded = new ConcurrentHashMap<>();
+  /** A lock per library, so that one thread loading a library does not hold up another's. */
+  private final Map<String, Object> loading = new ConcurrentHashMap<>();
+
   private Manifest manifest;
   private Path folder;
 
@@ -107,7 +110,9 @@ public final class Natives {
 
   /**
    * Returns the lookup for the library with the given logical name. On first use, this loads it
-   * and every library listed before it in the manifest.
+   * and, before it, the libraries it needs: those its {@code needs} line in the manifest names, or
+   * without one every library listed before it. Two threads that ask for libraries that do not need
+   * each other load them at the same time.
    *
    * @throws UnsatisfiedLinkError if the library cannot be found, unpacked or loaded
    */
@@ -141,24 +146,28 @@ public final class Natives {
     return system;
   }
 
-  synchronized SymbolLookup find(String name) {
+  SymbolLookup find(String name) {
     SymbolLookup lookup = loaded.get(name);
     if (lookup != null) {
       return lookup;
     }
-    Path from = prepare();
-    if (manifest.library(name) == null) {
-      throw error(
-          "There is no native library '" + name + "'. The manifest in " + from + " lists "
-              + String.join(", ", manifest.names()) + ".",
-          null);
-    }
-    for (Library library : manifest.libraries()) {
-      if (!loaded.containsKey(library.name())) {
-        loaded.put(library.name(), load(from.resolve(library.file())));
+    Path from;
+    List<Library> order;
+    synchronized (this) {
+      from = prepare();
+      if (manifest.library(name) == null) {
+        throw error(
+            "There is no native library '" + name + "'. The manifest in " + from + " lists "
+                + String.join(", ", manifest.names()) + ".",
+            null);
       }
-      if (library.name().equals(name)) {
-        break;
+      order = manifest.loadOrder(name);
+    }
+    for (Library library : order) {
+      synchronized (loading.computeIfAbsent(library.name(), n -> new Object())) {
+        if (!loaded.containsKey(library.name())) {
+          loaded.put(library.name(), load(from.resolve(library.file())));
+        }
       }
     }
     return loaded.get(name);

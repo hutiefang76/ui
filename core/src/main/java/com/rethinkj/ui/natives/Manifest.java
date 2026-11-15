@@ -4,10 +4,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -26,12 +28,14 @@ import java.util.regex.Pattern;
  *
  * <p>The first line gives the format; a reader rejects other formats. Each {@code library} line
  * has the logical name, the version, the file name and the SHA-256 of the file in lower-case hex.
- * The lines are in load order: a library comes after the libraries it needs. Lines with another
- * first word are ignored, so later versions of format 1 can add some. One such line is {@code built
- * <name> <sha256>}, which says that the library was built from the source archive with that hash
- * on the machine that wrote the manifest, so that its own hash is pinned nowhere.
+ * The lines are in load order: a library comes after the libraries it needs. Loading a library
+ * loads those first: the ones its {@code needs <name> [<library> ...]} line names, after its {@code
+ * library} line, which may name none; without such a line every library listed before it. Lines
+ * with another first word are ignored, so later versions of format 1 can add some. One such line
+ * is {@code built <name> <sha256>}, which says that the library was built from the source archive
+ * with that hash on the machine that wrote the manifest, so that its own hash is pinned nowhere.
  */
-record Manifest(String platform, List<Library> libraries) {
+record Manifest(String platform, List<Library> libraries, Map<String, List<String>> needs) {
 
   static final String FORMAT = "rethinkj-ui-natives";
   static final int VERSION = 1;
@@ -48,12 +52,14 @@ record Manifest(String platform, List<Library> libraries) {
 
   Manifest {
     libraries = List.copyOf(libraries);
+    needs = Map.copyOf(needs);
   }
 
   /** Reads the manifest, naming {@code source} in what it throws. */
   static Manifest parse(String text, String source) {
     String platform = null;
     List<Library> libraries = new ArrayList<>();
+    Map<String, List<String>> needs = new HashMap<>();
     Set<String> names = new HashSet<>();
     Set<String> files = new HashSet<>();
     boolean header = false;
@@ -101,6 +107,19 @@ record Manifest(String platform, List<Library> libraries) {
           }
           libraries.add(new Library(words[1], words[2], words[3], words[4]));
         }
+        case "needs" -> {
+          List<String> before = libraries.stream().map(Library::name).toList();
+          int index = words.length < 2 ? -1 : before.indexOf(words[1]);
+          List<String> those = List.of(words).subList(Math.min(2, words.length), words.length);
+          if (index < 0
+              || needs.containsKey(words[1])
+              || !before.subList(0, index).containsAll(those)) {
+            throw new IllegalArgumentException(at + "expected 'needs <name> [<library> ...]' once,"
+                + " after the library's line, naming libraries listed before it, got '" + line
+                + "'");
+          }
+          needs.put(words[1], List.copyOf(those));
+        }
         default -> {} // added by a later version of format 1
       }
     }
@@ -110,7 +129,34 @@ record Manifest(String platform, List<Library> libraries) {
     if (platform == null || libraries.isEmpty()) {
       throw new IllegalArgumentException(source + " names no platform or no library");
     }
-    return new Manifest(platform, libraries);
+    return new Manifest(platform, libraries, needs);
+  }
+
+  /**
+   * The libraries to load for the one named, in load order: the libraries it needs and theirs, and
+   * itself last.
+   */
+  List<Library> loadOrder(String name) {
+    Set<String> wanted = new HashSet<>();
+    want(name, wanted);
+    return libraries.stream().filter(library -> wanted.contains(library.name())).toList();
+  }
+
+  private void want(String name, Set<String> wanted) {
+    if (!wanted.add(name)) {
+      return;
+    }
+    List<String> named = needs.get(name);
+    if (named != null) {
+      named.forEach(other -> want(other, wanted));
+      return;
+    }
+    for (Library library : libraries) {
+      if (library.name().equals(name)) {
+        break;
+      }
+      want(library.name(), wanted);
+    }
   }
 
   Library library(String name) {

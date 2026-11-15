@@ -56,7 +56,9 @@ import java.util.zip.ZipFile;
  * Windows, it uses Visual Studio's compiler and finds its tools without the PATH; {@link
  * WindowsTools} says how.
  *
- * <p>The manifest lists the libraries in load order with their versions and SHA-256 hashes. A
+ * <p>The manifest lists the libraries in load order with their versions and SHA-256 hashes, and
+ * for each library with a {@code <name>.needs} line the libraries it needs, so that loading it
+ * loads only those first. A
  * library built from source gets a {@code built <name> <archive sha256>} line as well: its own
  * hash differs from machine to machine and is pinned nowhere. {@code
  * com.rethinkj.ui.natives.Manifest} in core reads the manifest and ignores that line.
@@ -80,14 +82,18 @@ final class FetchNatives {
   private static final Pattern CMAKE_RESULT =
       Pattern.compile("--\\s+(\\S+)\\s+\\(Wanted: ON\\): (\\S+)");
 
-  /** {@code cmake} is null for a release archive, else the options to build the source with. */
+  /**
+   * {@code cmake} is null for a release archive, else the options to build the source with; {@code
+   * needs} null for every library before it, else the libraries it needs.
+   */
   record Library(
       String name,
       String version,
       URI archive,
       String archiveSha256,
       String entry,
-      List<String> cmake) {
+      List<String> cmake,
+      List<String> needs) {
 
     boolean built() {
       return cmake != null;
@@ -169,7 +175,8 @@ final class FetchNatives {
               cmake != null),
           value(properties, config, name + ".archive.sha256", SHA256),
           value(properties, config, name + ".entry", ENTRY),
-          cmake);
+          cmake,
+          needs(properties, config, name, libraries));
       if (library.file().equals(MANIFEST)) {
         throw new Failure(config + ": a library cannot be called " + MANIFEST + ".");
       }
@@ -201,7 +208,9 @@ final class FetchNatives {
           .append("# The native libraries for ")
           .append(platform)
           .append(", in load order.\n")
-          .append("# library <name> <version> <file> <sha256>\n");
+          .append("# library <name> <version> <file> <sha256>\n")
+          .append("# needs <name> [<library> ...]: loading it loads only these first, not all before"
+              + " it\n");
       if (libraries.stream().anyMatch(Library::built)) {
         manifest.append("# built <name> <sha256 of the source archive>: built from source by the"
             + " machine that wrote\n# this file, so the library's own hash is pinned nowhere.\n");
@@ -242,6 +251,11 @@ final class FetchNatives {
             .append(' ')
             .append(sha256)
             .append('\n');
+        if (library.needs() != null) {
+          manifest.append("needs ").append(library.name());
+          library.needs().forEach(other -> manifest.append(' ').append(other));
+          manifest.append('\n');
+        }
         if (library.built()) {
           manifest
               .append("built ")
@@ -272,6 +286,26 @@ final class FetchNatives {
         deleteTree(staging);
       }
     }
+  }
+
+  /**
+   * The libraries {@code <name>.needs} names, which come before it in {@code libraries}; null
+   * without that line, so that loading it loads every library before it.
+   */
+  private static List<String> needs(
+      Properties properties, Path config, String name, List<Library> before) throws Failure {
+    String text = properties.getProperty(name + ".needs");
+    if (text == null) {
+      return null;
+    }
+    List<String> needs = text.isBlank() ? List.of() : List.of(text.strip().split("\\s+"));
+    for (String other : needs) {
+      if (before.stream().noneMatch(library -> library.name().equals(other))) {
+        throw new Failure(config + ": " + name + ".needs names " + other + ", which does not come"
+            + " before " + name + " in libraries.");
+      }
+    }
+    return needs;
   }
 
   private static boolean upToDate(Path stamp, String source, Path folder, List<Library> libraries)
