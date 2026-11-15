@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Raw bindings for the part of wgpu-native v29 ({@code webgpu.h} and {@code wgpu.h}) a 2D renderer
@@ -317,7 +318,10 @@ final class Wgpu {
       "wgpuRenderPassEncoderEnd", VOID_HANDLE,
       "wgpuRenderPassEncoderRelease", VOID_HANDLE);
 
-  /** The method handles; initialising this class loads the library. */
+  /**
+   * The handles for making an instance, a device and a pipeline: what a context made ahead needs
+   * before its pipeline is ready. Initialising this class loads the library.
+   */
   private static final class Fn {
     private static final SymbolLookup LIBRARY = Natives.lookup("wgpu_native");
 
@@ -325,9 +329,7 @@ final class Wgpu {
     static final MethodHandle SET_LOG_CALLBACK = bind("wgpuSetLogCallback");
     static final MethodHandle SET_LOG_LEVEL = bind("wgpuSetLogLevel");
     static final MethodHandle CREATE_INSTANCE = bind("wgpuCreateInstance");
-    static final MethodHandle INSTANCE_CREATE_SURFACE = bind("wgpuInstanceCreateSurface");
     static final MethodHandle INSTANCE_REQUEST_ADAPTER = bind("wgpuInstanceRequestAdapter");
-    static final MethodHandle INSTANCE_RELEASE = bind("wgpuInstanceRelease");
     static final MethodHandle ADAPTER_GET_INFO = bind("wgpuAdapterGetInfo");
     static final MethodHandle ADAPTER_INFO_FREE_MEMBERS = bind("wgpuAdapterInfoFreeMembers");
     static final MethodHandle ADAPTER_GET_LIMITS = bind("wgpuAdapterGetLimits");
@@ -339,7 +341,6 @@ final class Wgpu {
     static final MethodHandle DEVICE_PUSH_ERROR_SCOPE = bind("wgpuDevicePushErrorScope");
     static final MethodHandle DEVICE_POP_ERROR_SCOPE = bind("wgpuDevicePopErrorScope");
     static final MethodHandle DEVICE_CREATE_SHADER_MODULE = bind("wgpuDeviceCreateShaderModule");
-    static final MethodHandle DEVICE_CREATE_BUFFER = bind("wgpuDeviceCreateBuffer");
     static final MethodHandle DEVICE_CREATE_TEXTURE = bind("wgpuDeviceCreateTexture");
     static final MethodHandle DEVICE_CREATE_BIND_GROUP_LAYOUT =
         bind("wgpuDeviceCreateBindGroupLayout");
@@ -348,9 +349,35 @@ final class Wgpu {
         bind("wgpuDeviceCreatePipelineLayout");
     static final MethodHandle DEVICE_CREATE_RENDER_PIPELINE =
         bind("wgpuDeviceCreateRenderPipeline");
+    static final MethodHandle DEVICE_POLL = bind("wgpuDevicePoll");
+    static final MethodHandle TEXTURE_CREATE_VIEW = bind("wgpuTextureCreateView");
+    static final MethodHandle PIPELINE_LAYOUT_RELEASE = bind("wgpuPipelineLayoutRelease");
+
+    static MethodHandle bind(String name) {
+      FunctionDescriptor descriptor = FUNCTIONS.get(name);
+      if (descriptor == null) {
+        throw new IllegalStateException(name + " is not listed in Wgpu.FUNCTIONS");
+      }
+      MemorySegment symbol = LIBRARY
+          .find(name)
+          .orElseThrow(
+              () -> new UnsatisfiedLinkError("The wgpu_native library has no function " + name
+                  + ". The natives module does not" + " match this version of rethinkj-ui-core."));
+      return Linker.nativeLinker().downcallHandle(symbol, descriptor);
+    }
+  }
+
+  /**
+   * The handles for drawing and for releasing, bound on a thread of their own while the first
+   * instance requests its adapter ({@link #bindDrawing}), so that a context made ahead has its
+   * pipeline sooner.
+   */
+  private static final class Draw {
+    static final MethodHandle INSTANCE_CREATE_SURFACE = bind("wgpuInstanceCreateSurface");
+    static final MethodHandle INSTANCE_RELEASE = bind("wgpuInstanceRelease");
+    static final MethodHandle DEVICE_CREATE_BUFFER = bind("wgpuDeviceCreateBuffer");
     static final MethodHandle DEVICE_CREATE_COMMAND_ENCODER =
         bind("wgpuDeviceCreateCommandEncoder");
-    static final MethodHandle DEVICE_POLL = bind("wgpuDevicePoll");
     static final MethodHandle DEVICE_RELEASE = bind("wgpuDeviceRelease");
     static final MethodHandle QUEUE_SUBMIT = bind("wgpuQueueSubmit");
     static final MethodHandle QUEUE_WRITE_BUFFER = bind("wgpuQueueWriteBuffer");
@@ -369,12 +396,10 @@ final class Wgpu {
     static final MethodHandle BUFFER_GET_CONST_MAPPED_RANGE = bind("wgpuBufferGetConstMappedRange");
     static final MethodHandle BUFFER_UNMAP = bind("wgpuBufferUnmap");
     static final MethodHandle BUFFER_RELEASE = bind("wgpuBufferRelease");
-    static final MethodHandle TEXTURE_CREATE_VIEW = bind("wgpuTextureCreateView");
     static final MethodHandle TEXTURE_RELEASE = bind("wgpuTextureRelease");
     static final MethodHandle TEXTURE_VIEW_RELEASE = bind("wgpuTextureViewRelease");
     static final MethodHandle BIND_GROUP_LAYOUT_RELEASE = bind("wgpuBindGroupLayoutRelease");
     static final MethodHandle BIND_GROUP_RELEASE = bind("wgpuBindGroupRelease");
-    static final MethodHandle PIPELINE_LAYOUT_RELEASE = bind("wgpuPipelineLayoutRelease");
     static final MethodHandle RENDER_PIPELINE_RELEASE = bind("wgpuRenderPipelineRelease");
     static final MethodHandle COMMAND_ENCODER_BEGIN_RENDER_PASS =
         bind("wgpuCommandEncoderBeginRenderPass");
@@ -395,19 +420,31 @@ final class Wgpu {
     static final MethodHandle RENDER_PASS_END = bind("wgpuRenderPassEncoderEnd");
     static final MethodHandle RENDER_PASS_RELEASE = bind("wgpuRenderPassEncoderRelease");
 
+    /** Initialises this class: binds its handles. */
+    static void bind() {}
+
     private static MethodHandle bind(String name) {
-      FunctionDescriptor descriptor = FUNCTIONS.get(name);
-      if (descriptor == null) {
-        throw new IllegalStateException(name + " is not listed in Wgpu.FUNCTIONS");
-      }
-      MemorySegment symbol = LIBRARY
-          .find(name)
-          .orElseThrow(
-              () -> new UnsatisfiedLinkError("The wgpu_native library has no function " + name
-                  + ". The natives module does not" + " match this version of rethinkj-ui-core."));
-      return Linker.nativeLinker().downcallHandle(symbol, descriptor);
+      return Fn.bind(name);
     }
   }
+
+  /**
+   * Binds the handles for drawing on a thread of its own, once per process: they are not needed
+   * until the first frame, and binding 39 handles takes 20 to 50 ms.
+   */
+  static void bindDrawing() {
+    if (DRAWING.compareAndSet(false, true)) {
+      Thread.ofPlatform().name("rethinkj-ui wgpu").daemon().start(() -> {
+        try {
+          Draw.bind();
+        } catch (LinkageError e) {
+          // as a function missing from wgpu-native: the first frame throws it on its own thread
+        }
+      });
+    }
+  }
+
+  private static final AtomicBoolean DRAWING = new AtomicBoolean();
 
   // ---- global ------------------------------------------------------------------------------
 
@@ -447,7 +484,7 @@ final class Wgpu {
   }
 
   static MemorySegment instanceCreateSurface(MemorySegment instance, MemorySegment descriptor) {
-    return create(Fn.INSTANCE_CREATE_SURFACE, instance, descriptor);
+    return create(Draw.INSTANCE_CREATE_SURFACE, instance, descriptor);
   }
 
   /** The callback runs inside this call in wgpu-native v29. */
@@ -465,7 +502,7 @@ final class Wgpu {
   }
 
   static void instanceRelease(MemorySegment instance) {
-    voidHandle(Fn.INSTANCE_RELEASE, instance);
+    voidHandle(Draw.INSTANCE_RELEASE, instance);
   }
 
   // ---- adapter -----------------------------------------------------------------------------
@@ -549,7 +586,7 @@ final class Wgpu {
   }
 
   static MemorySegment deviceCreateBuffer(MemorySegment device, MemorySegment descriptor) {
-    return create(Fn.DEVICE_CREATE_BUFFER, device, descriptor);
+    return create(Draw.DEVICE_CREATE_BUFFER, device, descriptor);
   }
 
   static MemorySegment deviceCreateTexture(MemorySegment device, MemorySegment descriptor) {
@@ -573,7 +610,7 @@ final class Wgpu {
   }
 
   static MemorySegment deviceCreateCommandEncoder(MemorySegment device, MemorySegment descriptor) {
-    return create(Fn.DEVICE_CREATE_COMMAND_ENCODER, device, descriptor);
+    return create(Draw.DEVICE_CREATE_COMMAND_ENCODER, device, descriptor);
   }
 
   /**
@@ -589,7 +626,7 @@ final class Wgpu {
   }
 
   static void deviceRelease(MemorySegment device) {
-    voidHandle(Fn.DEVICE_RELEASE, device);
+    voidHandle(Draw.DEVICE_RELEASE, device);
   }
 
   // ---- queue -------------------------------------------------------------------------------
@@ -597,7 +634,7 @@ final class Wgpu {
   /** Ends the process if a command buffer is invalid, already submitted or uses a mapped buffer. */
   static void queueSubmit(MemorySegment queue, long count, MemorySegment commandBuffers) {
     try {
-      Fn.QUEUE_SUBMIT.invokeExact(queue, count, commandBuffers);
+      Draw.QUEUE_SUBMIT.invokeExact(queue, count, commandBuffers);
     } catch (Throwable t) {
       throw rethrow(t);
     }
@@ -606,7 +643,7 @@ final class Wgpu {
   static void queueWriteBuffer(
       MemorySegment queue, MemorySegment buffer, long offset, MemorySegment data, long size) {
     try {
-      Fn.QUEUE_WRITE_BUFFER.invokeExact(queue, buffer, offset, data, size);
+      Draw.QUEUE_WRITE_BUFFER.invokeExact(queue, buffer, offset, data, size);
     } catch (Throwable t) {
       throw rethrow(t);
     }
@@ -624,14 +661,15 @@ final class Wgpu {
       MemorySegment dataLayout,
       MemorySegment writeSize) {
     try {
-      Fn.QUEUE_WRITE_TEXTURE.invokeExact(queue, destination, data, dataSize, dataLayout, writeSize);
+      Draw.QUEUE_WRITE_TEXTURE.invokeExact(
+          queue, destination, data, dataSize, dataLayout, writeSize);
     } catch (Throwable t) {
       throw rethrow(t);
     }
   }
 
   static void queueRelease(MemorySegment queue) {
-    voidHandle(Fn.QUEUE_RELEASE, queue);
+    voidHandle(Draw.QUEUE_RELEASE, queue);
   }
 
   // ---- surface -----------------------------------------------------------------------------
@@ -639,7 +677,7 @@ final class Wgpu {
   static int surfaceGetCapabilities(
       MemorySegment surface, MemorySegment adapter, MemorySegment capabilities) {
     try {
-      return (int) Fn.SURFACE_GET_CAPABILITIES.invokeExact(surface, adapter, capabilities);
+      return (int) Draw.SURFACE_GET_CAPABILITIES.invokeExact(surface, adapter, capabilities);
     } catch (Throwable t) {
       throw rethrow(t);
     }
@@ -647,7 +685,7 @@ final class Wgpu {
 
   static void surfaceCapabilitiesFreeMembers(MemorySegment capabilities) {
     try {
-      Fn.SURFACE_CAPABILITIES_FREE_MEMBERS.invokeExact(capabilities);
+      Draw.SURFACE_CAPABILITIES_FREE_MEMBERS.invokeExact(capabilities);
     } catch (Throwable t) {
       throw rethrow(t);
     }
@@ -656,7 +694,7 @@ final class Wgpu {
   /** Ends the process on any error, a width or height of zero among them. */
   static void surfaceConfigure(MemorySegment surface, MemorySegment configuration) {
     try {
-      Fn.SURFACE_CONFIGURE.invokeExact(surface, configuration);
+      Draw.SURFACE_CONFIGURE.invokeExact(surface, configuration);
     } catch (Throwable t) {
       throw rethrow(t);
     }
@@ -665,7 +703,7 @@ final class Wgpu {
   /** Ends the process if the surface is not configured or its last texture is still held. */
   static void surfaceGetCurrentTexture(MemorySegment surface, MemorySegment surfaceTexture) {
     try {
-      Fn.SURFACE_GET_CURRENT_TEXTURE.invokeExact(surface, surfaceTexture);
+      Draw.SURFACE_GET_CURRENT_TEXTURE.invokeExact(surface, surfaceTexture);
     } catch (Throwable t) {
       throw rethrow(t);
     }
@@ -673,24 +711,24 @@ final class Wgpu {
 
   static int surfacePresent(MemorySegment surface) {
     try {
-      return (int) Fn.SURFACE_PRESENT.invokeExact(surface);
+      return (int) Draw.SURFACE_PRESENT.invokeExact(surface);
     } catch (Throwable t) {
       throw rethrow(t);
     }
   }
 
   static void surfaceUnconfigure(MemorySegment surface) {
-    voidHandle(Fn.SURFACE_UNCONFIGURE, surface);
+    voidHandle(Draw.SURFACE_UNCONFIGURE, surface);
   }
 
   static void surfaceRelease(MemorySegment surface) {
-    voidHandle(Fn.SURFACE_RELEASE, surface);
+    voidHandle(Draw.SURFACE_RELEASE, surface);
   }
 
   // ---- shader module, buffer, texture ------------------------------------------------------
 
   static void shaderModuleRelease(MemorySegment module) {
-    voidHandle(Fn.SHADER_MODULE_RELEASE, module);
+    voidHandle(Draw.SHADER_MODULE_RELEASE, module);
   }
 
   /** The callback runs inside a later {@link #devicePoll}. */
@@ -703,7 +741,7 @@ final class Wgpu {
       MemorySegment callbackInfo) {
     try {
       MemorySegment future = (MemorySegment)
-          Fn.BUFFER_MAP_ASYNC.invokeExact(allocator, buffer, mode, offset, size, callbackInfo);
+          Draw.BUFFER_MAP_ASYNC.invokeExact(allocator, buffer, mode, offset, size, callbackInfo);
     } catch (Throwable t) {
       throw rethrow(t);
     }
@@ -712,18 +750,18 @@ final class Wgpu {
   /** Ends the process if the range is not mapped. */
   static MemorySegment bufferGetConstMappedRange(MemorySegment buffer, long offset, long size) {
     try {
-      return (MemorySegment) Fn.BUFFER_GET_CONST_MAPPED_RANGE.invokeExact(buffer, offset, size);
+      return (MemorySegment) Draw.BUFFER_GET_CONST_MAPPED_RANGE.invokeExact(buffer, offset, size);
     } catch (Throwable t) {
       throw rethrow(t);
     }
   }
 
   static void bufferUnmap(MemorySegment buffer) {
-    voidHandle(Fn.BUFFER_UNMAP, buffer);
+    voidHandle(Draw.BUFFER_UNMAP, buffer);
   }
 
   static void bufferRelease(MemorySegment buffer) {
-    voidHandle(Fn.BUFFER_RELEASE, buffer);
+    voidHandle(Draw.BUFFER_RELEASE, buffer);
   }
 
   static MemorySegment textureCreateView(MemorySegment texture, MemorySegment descriptor) {
@@ -732,21 +770,21 @@ final class Wgpu {
 
   /** For a surface texture that was not presented, this gives it back to the surface. */
   static void textureRelease(MemorySegment texture) {
-    voidHandle(Fn.TEXTURE_RELEASE, texture);
+    voidHandle(Draw.TEXTURE_RELEASE, texture);
   }
 
   static void textureViewRelease(MemorySegment view) {
-    voidHandle(Fn.TEXTURE_VIEW_RELEASE, view);
+    voidHandle(Draw.TEXTURE_VIEW_RELEASE, view);
   }
 
   // ---- bind groups and pipelines -----------------------------------------------------------
 
   static void bindGroupLayoutRelease(MemorySegment layout) {
-    voidHandle(Fn.BIND_GROUP_LAYOUT_RELEASE, layout);
+    voidHandle(Draw.BIND_GROUP_LAYOUT_RELEASE, layout);
   }
 
   static void bindGroupRelease(MemorySegment group) {
-    voidHandle(Fn.BIND_GROUP_RELEASE, group);
+    voidHandle(Draw.BIND_GROUP_RELEASE, group);
   }
 
   static void pipelineLayoutRelease(MemorySegment layout) {
@@ -754,14 +792,14 @@ final class Wgpu {
   }
 
   static void renderPipelineRelease(MemorySegment pipeline) {
-    voidHandle(Fn.RENDER_PIPELINE_RELEASE, pipeline);
+    voidHandle(Draw.RENDER_PIPELINE_RELEASE, pipeline);
   }
 
   // ---- commands ----------------------------------------------------------------------------
 
   static MemorySegment commandEncoderBeginRenderPass(
       MemorySegment encoder, MemorySegment descriptor) {
-    return create(Fn.COMMAND_ENCODER_BEGIN_RENDER_PASS, encoder, descriptor);
+    return create(Draw.COMMAND_ENCODER_BEGIN_RENDER_PASS, encoder, descriptor);
   }
 
   static void commandEncoderCopyTextureToBuffer(
@@ -770,7 +808,8 @@ final class Wgpu {
       MemorySegment destination,
       MemorySegment copySize) {
     try {
-      Fn.COMMAND_ENCODER_COPY_TEXTURE_TO_BUFFER.invokeExact(encoder, source, destination, copySize);
+      Draw.COMMAND_ENCODER_COPY_TEXTURE_TO_BUFFER.invokeExact(
+          encoder, source, destination, copySize);
     } catch (Throwable t) {
       throw rethrow(t);
     }
@@ -778,20 +817,20 @@ final class Wgpu {
 
   /** Reports what was wrong with the recorded commands, and returns a handle even then. */
   static MemorySegment commandEncoderFinish(MemorySegment encoder, MemorySegment descriptor) {
-    return create(Fn.COMMAND_ENCODER_FINISH, encoder, descriptor);
+    return create(Draw.COMMAND_ENCODER_FINISH, encoder, descriptor);
   }
 
   static void commandEncoderRelease(MemorySegment encoder) {
-    voidHandle(Fn.COMMAND_ENCODER_RELEASE, encoder);
+    voidHandle(Draw.COMMAND_ENCODER_RELEASE, encoder);
   }
 
   static void commandBufferRelease(MemorySegment commandBuffer) {
-    voidHandle(Fn.COMMAND_BUFFER_RELEASE, commandBuffer);
+    voidHandle(Draw.COMMAND_BUFFER_RELEASE, commandBuffer);
   }
 
   static void renderPassSetPipeline(MemorySegment pass, MemorySegment pipeline) {
     try {
-      Fn.RENDER_PASS_SET_PIPELINE.invokeExact(pass, pipeline);
+      Draw.RENDER_PASS_SET_PIPELINE.invokeExact(pass, pipeline);
     } catch (Throwable t) {
       throw rethrow(t);
     }
@@ -799,7 +838,7 @@ final class Wgpu {
 
   static void renderPassSetBindGroup(MemorySegment pass, int index, MemorySegment group) {
     try {
-      Fn.RENDER_PASS_SET_BIND_GROUP.invokeExact(pass, index, group, 0L, MemorySegment.NULL);
+      Draw.RENDER_PASS_SET_BIND_GROUP.invokeExact(pass, index, group, 0L, MemorySegment.NULL);
     } catch (Throwable t) {
       throw rethrow(t);
     }
@@ -809,7 +848,7 @@ final class Wgpu {
   static void renderPassSetVertexBuffer(
       MemorySegment pass, int slot, MemorySegment buffer, long offset, long size) {
     try {
-      Fn.RENDER_PASS_SET_VERTEX_BUFFER.invokeExact(pass, slot, buffer, offset, size);
+      Draw.RENDER_PASS_SET_VERTEX_BUFFER.invokeExact(pass, slot, buffer, offset, size);
     } catch (Throwable t) {
       throw rethrow(t);
     }
@@ -817,7 +856,7 @@ final class Wgpu {
 
   static void renderPassSetScissorRect(MemorySegment pass, int x, int y, int width, int height) {
     try {
-      Fn.RENDER_PASS_SET_SCISSOR_RECT.invokeExact(pass, x, y, width, height);
+      Draw.RENDER_PASS_SET_SCISSOR_RECT.invokeExact(pass, x, y, width, height);
     } catch (Throwable t) {
       throw rethrow(t);
     }
@@ -832,7 +871,7 @@ final class Wgpu {
       float minDepth,
       float maxDepth) {
     try {
-      Fn.RENDER_PASS_SET_VIEWPORT.invokeExact(pass, x, y, width, height, minDepth, maxDepth);
+      Draw.RENDER_PASS_SET_VIEWPORT.invokeExact(pass, x, y, width, height, minDepth, maxDepth);
     } catch (Throwable t) {
       throw rethrow(t);
     }
@@ -841,18 +880,19 @@ final class Wgpu {
   static void renderPassDraw(
       MemorySegment pass, int vertexCount, int instanceCount, int firstVertex, int firstInstance) {
     try {
-      Fn.RENDER_PASS_DRAW.invokeExact(pass, vertexCount, instanceCount, firstVertex, firstInstance);
+      Draw.RENDER_PASS_DRAW.invokeExact(
+          pass, vertexCount, instanceCount, firstVertex, firstInstance);
     } catch (Throwable t) {
       throw rethrow(t);
     }
   }
 
   static void renderPassEnd(MemorySegment pass) {
-    voidHandle(Fn.RENDER_PASS_END, pass);
+    voidHandle(Draw.RENDER_PASS_END, pass);
   }
 
   static void renderPassRelease(MemorySegment pass) {
-    voidHandle(Fn.RENDER_PASS_RELEASE, pass);
+    voidHandle(Draw.RENDER_PASS_RELEASE, pass);
   }
 
   // ---- strings -----------------------------------------------------------------------------

@@ -1,0 +1,1 @@
+- Making the first GPU instance now binds only the wgpu-native functions that making a device and a pipeline needs; those for drawing are bound on a thread of their own meanwhile, so that the device made while the first window opens is ready sooner.

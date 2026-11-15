@@ -68,6 +68,7 @@ public final class Instance extends GpuObject {
     // Loads the library with a message that explains what is missing, before Wgpu needs it.
     Natives.lookup("wgpu_native");
     installLog();
+    Wgpu.bindDrawing(); // meanwhile, as this thread creates the instance and requests an adapter
     try (Arena arena = Arena.ofConfined()) {
       MemorySegment extras = InstanceExtras.allocate(arena);
       extras.set(JAVA_LONG, InstanceExtras.BACKENDS, backend.instanceBit);
