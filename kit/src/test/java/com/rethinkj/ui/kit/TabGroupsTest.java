@@ -354,6 +354,72 @@ class TabGroupsTest {
     assertNull(d.groups.groupOf("x"));
   }
 
+  // Focus
+
+  @Test
+  void eachTabsContentRemembersItsOwnFocus() throws IOException {
+    TabGroups<String> groups = new TabGroups<>(List.of("a", "b", "c"), (g, o) -> null);
+    App<Object> app = new App<>(
+        new Object(),
+        s -> col()
+            .wFull()
+            .hFull()
+            .children(
+                El.el().key("tree").focusable().size(10, 10),
+                groups
+                    .tabs(
+                        T,
+                        groups.main(),
+                        Tab::new,
+                        x -> col()
+                            .children(
+                                El.el()
+                                    .key("refresh")
+                                    .label("Refresh")
+                                    .focusable()
+                                    .size(10, 10),
+                                x.equals("c") // still loading
+                                    ? El.el()
+                                    : El.el()
+                                        .key("grid")
+                                        .label("Grid " + x)
+                                        .focusable()
+                                        .defaultFocus()
+                                        .size(10, 10)))
+                    .grow(1)));
+    Script.run("size 400 160\nframe\nfocus #refresh\nfocus #tree\nframe", app, out);
+    app.post(() -> groups.select(groups.main(), 1)); // while the focus is outside, as from a tree
+    Script.run("await\nframe", app, out);
+    app.focus(find(app.tree(), "panel"));
+    app.frame();
+    assertEquals("Grid b", app.focused().label(), "b has not had the focus: its default");
+
+    Script.run("key Tab control shift\nframe", app, out);
+    assertEquals("Refresh", app.focused().label(), "back where it was in a");
+    assertEquals(0, groups.main().active());
+
+    app.post(() -> groups.select(groups.main(), 2));
+    Script.run("focus #tree\nawait\nframe", app, out);
+    app.focus(find(app.tree(), "panel"));
+    app.frame(); // c's Refresh, waiting for a grid
+    Script.run("key Tab control\nframe", app, out);
+    assertEquals(0, groups.main().active(), "around to a");
+    assertEquals("Refresh", app.focused().label(), "a's own memory, not its grid");
+  }
+
+  private static El find(El el, String key) {
+    if (key.equals(el.key())) {
+      return el;
+    }
+    for (El child : el.children()) {
+      El found = find(child, key);
+      if (found != null) {
+        return found;
+      }
+    }
+    return null;
+  }
+
   // Without the handlers
 
   @Test
