@@ -409,7 +409,7 @@ public final class Settings {
             "Appearance",
             section(
                 theme,
-                "Colours",
+                "Colors",
                 null,
                 group(
                     theme,
@@ -427,7 +427,7 @@ public final class Settings {
                             look -> state.theme = look)),
                     Group.row(
                         theme,
-                        "Accent colour",
+                        "Accent color",
                         "Buttons, switches and selections",
                         select(
                                 theme,
@@ -720,7 +720,7 @@ public final class Settings {
                 label(
                         theme,
                         Label.Variant.MUTED,
-                        "A database tool built with rethinkj UI. Free software under the MIT licence.")
+                        "A database tool built with rethinkj UI. Free software under the MIT license.")
                     .wrapText()))
         .grow(1);
   }

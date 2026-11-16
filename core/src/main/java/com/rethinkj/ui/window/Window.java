@@ -1822,7 +1822,7 @@ public final class Window implements AutoCloseable {
   }
 
   /**
-   * The colour, 0xAARRGGBB with the alpha ignored, that the system shows where a resize uncovers
+   * The color, 0xAARRGGBB with the alpha ignored, that the system shows where a resize uncovers
    * the window before the app has drawn the new size: on X11 the window's background, with what
    * it showed kept at its top left; without it the uncovered parts show what lay there, other
    * windows' content included. {@link WindowLoop} sets it to the fill of the app's root after
@@ -1877,7 +1877,7 @@ public final class Window implements AutoCloseable {
   }
 
   /**
-   * SDL_X11EventHook: notes the window manager's requests to synchronise a resize, and the time of
+   * SDL_X11EventHook: notes the window manager's requests to synchronize a resize, and the time of
    * each press.
    */
   private static boolean x11Event(MemorySegment userdata, MemorySegment xevent) {
@@ -1957,8 +1957,8 @@ public final class Window implements AutoCloseable {
 
   /**
    * How the system looks now: light or dark ({@code SDL_GetSystemTheme}), and on Windows the
-   * accent colour (the {@code AccentColor} of {@code HKCU\Software\Microsoft\Windows\DWM}, which
-   * is the colour chosen in Settings, else {@code DwmGetColorizationColor}) and high contrast
+   * accent color (the {@code AccentColor} of {@code HKCU\Software\Microsoft\Windows\DWM}, which
+   * is the color chosen in Settings, else {@code DwmGetColorizationColor}) and high contrast
    * ({@code SPI_GETHIGHCONTRAST}). Each change comes to every window as a {@link
    * WindowEvent.AppearanceChanged}: light and dark through SDL's {@code
    * SDL_EVENT_SYSTEM_THEME_CHANGED}, and on Windows the accent and high contrast when the window
@@ -1977,7 +1977,7 @@ public final class Window implements AutoCloseable {
         scheme, windows ? Win32Shell.accent() : 0, windows && Win32Shell.highContrast());
   }
 
-  /** A message said that the system's colours may have changed: tells the windows if they did. */
+  /** A message said that the system's colors may have changed: tells the windows if they did. */
   static void appearanceMayHaveChanged() {
     SystemAppearance now = systemAppearance();
     if (!now.equals(appearance)) {
@@ -2243,7 +2243,7 @@ public final class Window implements AutoCloseable {
 
   /**
    * A position in window units as logical pixels. Where it is a whole physical pixel, as the
-   * pointer's always is on Windows and X11, it is that pixel's centre, a 256th of a pixel towards
+   * pointer's always is on Windows and X11, it is that pixel's center, a 256th of a pixel towards
    * its top left: the scene snaps the edges of boxes to whole pixels, halves up, so a pixel is
    * drawn as part of a box exactly when that point lies in the box's layout rectangle, edges
    * included. A press then reaches the box that drew the pixel under it, also at 1.25 or 1.5, and
@@ -2288,7 +2288,7 @@ public final class Window implements AutoCloseable {
     return failure != null;
   }
 
-  /** Initialises SDL's video on this thread, or checks that this is the thread it runs on. */
+  /** Initializes SDL's video on this thread, or checks that this is the thread it runs on. */
   static void start() {
     Thread current = Thread.currentThread();
     Thread owner = thread;
@@ -2305,7 +2305,7 @@ public final class Window implements AutoCloseable {
     // The app draws the composition of an input method, the system its candidates.
     Sdl.setHint(Sdl.HINT_IME_IMPLEMENTED_UI, "composition");
     // SDL counts a second press within 32 pixels of the first as a double press, as for fingers
-    // on a touch screen: two quick presses on neighbouring rows would be one. An environment
+    // on a touch screen: two quick presses on neighboring rows would be one. An environment
     // variable of the same name still wins.
     Sdl.setHint(Sdl.HINT_MOUSE_DOUBLE_CLICK_RADIUS, String.valueOf(doubleClickRadius()));
     String id;
@@ -2349,7 +2349,7 @@ public final class Window implements AutoCloseable {
   /**
    * How far, in window coordinates, a second press may lie from the first along each axis to make
    * a double press: on Windows half the system's rectangle for it ({@code SM_CXDOUBLECLK}, 4 by
-   * default, centred on the first press), elsewhere 5, GTK's default distance.
+   * default, centered on the first press), elsewhere 5, GTK's default distance.
    */
   static int doubleClickRadius() {
     if (!System.getProperty("os.name", "").startsWith("Windows")) {
@@ -2377,7 +2377,7 @@ public final class Window implements AutoCloseable {
     cursorShown = Cursor.DEFAULT;
     pointerWindow = null;
     appearance = null;
-    Win32Shell.releaseTaskbar(); // before SDL uninitialises COM
+    Win32Shell.releaseTaskbar(); // before SDL uninitializes COM
     synchronized (LOCK) {
       Sdl.quit();
       thread = null;

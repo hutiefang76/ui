@@ -16,7 +16,7 @@ import java.util.function.Supplier;
 
 /**
  * The values the kit's components read, named for what they are for rather than for how they look:
- * {@code text().muted()}, not "grey 500". Components take no colour, size or spring of their own,
+ * {@code text().muted()}, not "gray 500". Components take no color, size or spring of their own,
  * so a theme decides all of them.
  *
  * <p>A theme is immutable. {@link #DARK} and {@link #LIGHT} are a plain neutral default; an app
@@ -49,8 +49,8 @@ import java.util.function.Supplier;
  * <p>Menus, a select's list, tooltips and dialogs lie above the rest with the shadows of {@link
  * #elevation} and keep the subtle border around them.
  *
- * <p>Colours are 0xAARRGGBB ({@link Colors}), sizes logical pixels. The default themes are written
- * with the colours of {@link Palette}.
+ * <p>Colors are 0xAARRGGBB ({@link Colors}), sizes logical pixels. The default themes are written
+ * with the colors of {@link Palette}.
  */
 public record Theme(
     Surfaces surface,
@@ -156,7 +156,7 @@ public record Theme(
   }
 
   /**
-   * A theme whose colours for code are {@link Code#DARK} on a dark raised surface and {@link
+   * A theme whose colors for code are {@link Code#DARK} on a dark raised surface and {@link
    * Code#LIGHT} on a light one, with the default {@link Caption}, and whose documents look as
    * {@link Prose#DARK} or {@link Prose#LIGHT} by the same rule.
    */
@@ -301,7 +301,7 @@ public record Theme(
   }
 
   /**
-   * The colours of a {@link Badge} of one kind: a quiet one is {@code softText} on {@code soft},
+   * The colors of a {@link Badge} of one kind: a quiet one is {@code softText} on {@code soft},
    * a translucent tint laid over whatever the badge lies on, a strong one {@code strongText} on
    * {@code strong}.
    *
@@ -345,7 +345,7 @@ public record Theme(
 
     public Badges {
       if (avatars.isEmpty()) {
-        throw new IllegalArgumentException("at least one colour for avatars");
+        throw new IllegalArgumentException("at least one color for avatars");
       }
       avatars = List.copyOf(avatars);
     }
@@ -364,10 +364,10 @@ public record Theme(
 
     /** For dark surfaces. */
     public static final Badges DARK = new Badges(
-        new Tone(alpha(WHITE, 0.01f), GREY_853, GREY_395, WHITE),
+        new Tone(alpha(WHITE, 0.01f), GRAY_853, GRAY_395, WHITE),
         new Tone(alpha(BLUE_496, 0.07f), BLUE_782, BLUE_496, WHITE),
         new Tone(alpha(GREEN_735, 0.03f), GREEN_826, GREEN_452, WHITE),
-        new Tone(alpha(AMBER_745, 0.03f), AMBER_835, AMBER_745, GREY_108),
+        new Tone(alpha(AMBER_745, 0.03f), AMBER_835, AMBER_745, GRAY_108),
         new Tone(alpha(RED_649, 0.035f), RED_803, RED_457, WHITE),
         18,
         22,
@@ -377,10 +377,10 @@ public record Theme(
 
     /** For light surfaces. */
     public static final Badges LIGHT = new Badges(
-        new Tone(alpha(GREY_407, 0.1f), GREY_314, GREY_407, WHITE),
+        new Tone(alpha(GRAY_407, 0.1f), GRAY_314, GRAY_407, WHITE),
         new Tone(alpha(BLUE_447, 0.12f), BLUE_366, BLUE_447, WHITE),
         new Tone(alpha(GREEN_389, 0.13f), GREEN_333, GREEN_389, WHITE),
-        new Tone(alpha(AMBER_622, 0.17f), AMBER_327, AMBER_735, GREY_108),
+        new Tone(alpha(AMBER_622, 0.17f), AMBER_327, AMBER_735, GRAY_108),
         new Tone(alpha(RED_395, 0.12f), RED_345, RED_395, WHITE),
         18,
         22,
@@ -390,7 +390,7 @@ public record Theme(
   }
 
   /**
-   * The colours of a {@link Callout} of one kind.
+   * The colors of a {@link Callout} of one kind.
    *
    * @param fill opaque, the callout's background, a tint of the kind over the raised surface
    * @param mark the bar at the callout's leading edge and its icon, 3:1 on {@code fill}
@@ -399,8 +399,8 @@ public record Theme(
 
   /**
    * How {@link Callout}s look: a tinted fill per kind with a bar and an icon in the kind's
-   * colour. The fills are tints laid over the raised surface ({@link Colors#over}): in the light
-   * theme the badges' quiet tints, in the dark theme each kind's status colour at 10 %, so that the
+   * color. The fills are tints laid over the raised surface ({@link Colors#over}): in the light
+   * theme the badges' quiet tints, in the dark theme each kind's status color at 10 %, so that the
    * four are about as light as each other. {@code info} is the theme's blue, as links and the grid's selection are: it does
    * not follow {@link #withAccent}.
    *
@@ -421,11 +421,11 @@ public record Theme(
 
     /** For a dark raised surface. */
     public static final Callouts DARK = new Callouts(
-        new CalloutTone(Colors.over(GREY_122, alpha(BLUE_694, 0.1f)), BLUE_694),
-        new CalloutTone(Colors.over(GREY_122, alpha(AMBER_745, 0.1f)), AMBER_745),
-        new CalloutTone(Colors.over(GREY_122, alpha(RED_649, 0.1f)), RED_649),
-        new CalloutTone(Colors.over(GREY_122, alpha(GREEN_735, 0.1f)), GREEN_735),
-        GREY_747,
+        new CalloutTone(Colors.over(GRAY_122, alpha(BLUE_694, 0.1f)), BLUE_694),
+        new CalloutTone(Colors.over(GRAY_122, alpha(AMBER_745, 0.1f)), AMBER_745),
+        new CalloutTone(Colors.over(GRAY_122, alpha(RED_649, 0.1f)), RED_649),
+        new CalloutTone(Colors.over(GRAY_122, alpha(GREEN_735, 0.1f)), GREEN_735),
+        GRAY_747,
         3);
 
     /** For a light raised surface. */
@@ -434,7 +434,7 @@ public record Theme(
         new CalloutTone(Colors.over(WHITE, Badges.LIGHT.warning().soft()), AMBER_384),
         new CalloutTone(Colors.over(WHITE, Badges.LIGHT.danger().soft()), RED_395),
         new CalloutTone(Colors.over(WHITE, Badges.LIGHT.success().soft()), GREEN_389),
-        GREY_375,
+        GRAY_375,
         3);
 
     /** The tone of a kind. */
@@ -450,7 +450,7 @@ public record Theme(
 
   /**
    * How a document looks that {@link Markdown} shows, on a card ({@link Surfaces#panel}): its
-   * type, the colours of links, inline code and quotes, and how wide its text runs. Spaces between
+   * type, the colors of links, inline code and quotes, and how wide its text runs. Spaces between
    * blocks come from {@link Spacing}, code blocks from the raised surface and the subtle border.
    *
    * @param body paragraphs, lists, quotes and tables
@@ -478,16 +478,16 @@ public record Theme(
 
     /** For a dark panel. */
     public static final Prose DARK =
-        new Prose(BODY, HEADINGS, BLUE_694, alpha(WHITE, 0.024f), GREY_311, 720);
+        new Prose(BODY, HEADINGS, BLUE_694, alpha(WHITE, 0.024f), GRAY_311, 720);
 
     /** For a light panel. */
     public static final Prose LIGHT =
-        new Prose(BODY, HEADINGS, BLUE_403, alpha(BLACK, 0.08f), GREY_805, 720);
+        new Prose(BODY, HEADINGS, BLUE_403, alpha(BLACK, 0.08f), GRAY_805, 720);
   }
 
   /**
-   * Whether a colour is light, from 0 to 1: the luma of its sRGB values as they are, not in linear
-   * light, which is all the shorter constructors need to tell a dark theme's colour from a light
+   * Whether a color is light, from 0 to 1: the luma of its sRGB values as they are, not in linear
+   * light, which is all the shorter constructors need to tell a dark theme's color from a light
    * one's.
    */
   private static double lightness(int argb) {
@@ -496,7 +496,7 @@ public record Theme(
   }
 
   /**
-   * The colours of code in an editor ({@link CodeEditor}, {@link Sql}): text colours for the kinds
+   * The colors of code in an editor ({@link CodeEditor}, {@link Sql}): text colors for the kinds
    * of token, each 4.5:1 on the field's raised surface, also hovered and on the caret's line, and
    * translucent backgrounds laid over that surface.
    *
@@ -532,7 +532,7 @@ public record Theme(
         VIOLET_782,
         GREEN_823,
         ORANGE_806,
-        GREY_747,
+        GRAY_747,
         CYAN_843,
         alpha(WHITE, 0.016f),
         alpha(WHITE, 0.047f),
@@ -546,7 +546,7 @@ public record Theme(
         VIOLET_362,
         GREEN_378,
         ORANGE_380,
-        GREY_386,
+        GRAY_386,
         CYAN_363,
         alpha(BLACK, 0.063f),
         alpha(BLACK, 0.15f),
@@ -556,7 +556,7 @@ public record Theme(
         alpha(TEAL_490, 0.2f));
 
     /**
-     * The colours of code with the background of a marked block of {@link #DARK} where the caret's
+     * The colors of code with the background of a marked block of {@link #DARK} where the caret's
      * line is light on dark, else of {@link #LIGHT}.
      */
     public Code(
@@ -585,7 +585,7 @@ public record Theme(
     }
 
     /**
-     * The colours of code with the backgrounds of a find, of a word's occurrences and of a marked
+     * The colors of code with the backgrounds of a find, of a word's occurrences and of a marked
      * block of {@link #DARK} where the caret's line is light on dark, else of {@link #LIGHT}.
      */
     public Code(
@@ -642,14 +642,14 @@ public record Theme(
    * @param primary most text
    * @param muted secondary text: hints, captions, values beside their names
    * @param disabled the text of a control that cannot be used now
-   * @param onAccent text and marks on the accent colour
+   * @param onAccent text and marks on the accent color
    */
   public record TextColors(int primary, int muted, int disabled, int onAccent) {}
 
   /**
    * @param subtle the edges of cards and of a surface's parts, the lines of a data grid, and the
    *     edges of a disabled control
-   * @param strong the edges a control is recognised by, such as the line along a text field's
+   * @param strong the edges a control is recognized by, such as the line along a text field's
    *     bottom or a checkbox's box, which stand out 3:1 from the surfaces and from a field's fill,
    *     also under the pointer
    * @param control the edge of a button and of other controls that their text names, quieter
@@ -661,7 +661,7 @@ public record Theme(
    *     footer, between a split's parts and between a toolbar's groups; 1.2:1 or more on every
    *     surface, stronger than {@code subtle}, which a raised surface would almost hide
    * @param trackOnAccent translucent, a spinner's ring on a primary button's fill, the accent's or
-   *     a dangerous one's, from which the arc in the button's text colour stands out 3:1
+   *     a dangerous one's, from which the arc in the button's text color stands out 3:1
    */
   public record Borders(
       int subtle, int strong, int control, int track, int divider, int trackOnAccent) {
@@ -688,7 +688,7 @@ public record Theme(
   }
 
   /**
-   * The colour of the main action and of what is on, with its hover and pressed variants.
+   * The color of the main action and of what is on, with its hover and pressed variants.
    *
    * @param selection translucent, behind selected text
    * @param edge the accent's lighter tone for lines and outlines: the focus ring, the active tab's
@@ -698,14 +698,14 @@ public record Theme(
    */
   public record Accent(int color, int hover, int pressed, int selection, int edge) {
 
-    /** An accent whose selection is its colour at 40 % opacity and whose edge is its colour. */
+    /** An accent whose selection is its color at 40 % opacity and whose edge is its color. */
     public Accent(int color, int hover, int pressed) {
       this(color, hover, pressed, alpha(color, 0.4f), color);
     }
   }
 
   /**
-   * A hue an app chooses its accent from instead of writing the accent's colours: {@code
+   * A hue an app chooses its accent from instead of writing the accent's colors: {@code
    * theme.withAccent(Theme.Hue.VIOLET)} takes the {@link Accent} of this hue made for the theme's
    * lightness, {@link #dark()} or {@link #light()}. Each holds the rules of the default themes in
    * both of them (white text 4.5:1 on the accent, its hover and pressed; the accent 3:1 on cards
@@ -714,7 +714,7 @@ public record Theme(
    *
    * <p>{@link #BLUE} is the default themes' accent. The others are made by one rule: in a dark
    * theme the accent is the hue's fill of {@link Palette} at about L* 49 (an {@link Avatar}'s
-   * fill), hover and pressed that colour with 12 % and 24 % less light ({@link Colors#mix} with
+   * fill), hover and pressed that color with 12 % and 24 % less light ({@link Colors#mix} with
    * black, which keeps the hue), the selection the accent at 40 %, and the edge the hue's tone at
    * L* 70; in a light theme the accent is the dark one with 25 % less light and its own edge, hover
    * and pressed as before, the selection at 35 %, as the default's.
@@ -734,7 +734,7 @@ public record Theme(
     AMBER(AMBER_491, AMBER_701),
     GREEN(GREEN_492, GREEN_702),
     TEAL(TEAL_490, TEAL_700),
-    GREY(GREY_477, GREY_700);
+    GRAY(GRAY_477, GRAY_700);
 
     private final Accent dark;
     private final Accent light;
@@ -767,7 +767,7 @@ public record Theme(
   }
 
   /**
-   * The colours of a button whose action destroys something ({@link Button.Tone#DANGER}), in each
+   * The colors of a button whose action destroys something ({@link Button.Tone#DANGER}), in each
    * of its variants: a primary one is {@code onColor} on {@code color}, a secondary one {@code
    * text} on the raised surface inside {@code edge}, a ghost one {@code text} alone. The defaults
    * are {@link Hue#RED}'s accent of the theme's lightness, so the same rules hold: {@code onColor}
@@ -795,7 +795,7 @@ public record Theme(
     }
   }
 
-  /** Colours of text and marks that report a state. */
+  /** Colors of text and marks that report a state. */
   public record Status(int danger, int warning, int success) {}
 
   /** Steps of space between and inside elements. */
@@ -1054,7 +1054,7 @@ public record Theme(
   }
 
   /**
-   * @param feedback colours that answer the pointer and a change of state
+   * @param feedback colors that answer the pointer and a change of state
    * @param move parts that travel, such as a toggle's knob
    * @param submenuDelay seconds the pointer rests on a menu's item before its submenu opens, or
    *     the open one closes
@@ -1116,7 +1116,7 @@ public record Theme(
    * The data grid's sizes and backgrounds. Its lines are {@link Borders#subtle}, its selected
    * rows and cells are a tint without an edge, and its hovered
    * rows and header cells lay {@link Surfaces#hover} and {@link Surfaces#pressed} over these. The
-   * {@link Tree} takes its row height and the colours of its selected rows from here too.
+   * {@link Tree} takes its row height and the colors of its selected rows from here too.
    *
    * @param rowHeight the height of a row and of the header
    * @param minColumn the narrowest a column can be made by dragging its edge or fitting it
@@ -1125,7 +1125,7 @@ public record Theme(
    * @param mark the size of the sort arrows in the header
    * @param header the background of the header, a quiet band
    * @param row the background of the rows, and of the grid below the last one
-   * @param stripe the background of every other row; the row's colour for none
+   * @param stripe the background of every other row; the row's color for none
    * @param selected the selected rows or cells while the grid has the keyboard focus
    * @param selectedInactive the selected rows or cells while the focus is elsewhere
    * @param cursor the outline of the cell the cursor is on while the grid has the focus, which
@@ -1200,7 +1200,7 @@ public record Theme(
    * The shadows under what lies above the rest ({@link com.rethinkj.ui.El#shadow}), each a tight
    * one that darkens the edge and a wide one that shows the height, the first on top. A dark theme
    * needs them stronger and tighter than a light one: a shadow shows little on a dark surface, and
-   * a wide one only greys it. The renderer mixes them in linear light, where a shadow shows about
+   * a wide one only grays it. The renderer mixes them in linear light, where a shadow shows about
    * half as much as the same alpha in CSS.
    *
    * @param card cards on the window, lifted a little
@@ -1256,18 +1256,18 @@ public record Theme(
    * (raised) a step above it, white in the light theme, where a control is told apart by its edge.
    * Popups are a step lighter again in the dark theme, so that a menu stands apart from the card
    * behind it, and white in the light one, told apart by their edge and shadow. The item under the
-   * pointer or the keys in a popup's list (highlight) is a neutral grey 6 L* or more from the
+   * pointer or the keys in a popup's list (highlight) is a neutral gray 6 L* or more from the
    * popup, with primary, muted and danger text 4.5:1 on it; the accent's tint marks a selection. In the light theme they are four tones: window L* 93,
    * band 97, panel 99 and raised 100. Hairlines (subtle) are a low-contrast step from the card; a
    * button's edge (control) a little more. A divider, the hairline that separates content on a
    * surface, stands out 1.2:1 or more from every surface it is drawn on: in the dark theme it is
-   * the button's edge, in the light one the step it needs on the grey window.
+   * the button's edge, in the light one the step it needs on the gray window.
    *
-   * Hover and pressed. A neutral grey laid over the surface, mixed in linear light both by
-   * Theme.over and by the renderer, so every component gives the same colour: hover 4 L* or more
-   * from the surface, pressed 3 L* or more beyond hover. In the dark theme a lighter grey near the
-   * surfaces at 25 % and 45 %; in the light one a grey (L* 77) at 33 % and 57 %, which darkens the
-   * grey window by as much as the rules ask, as it does the white surfaces.
+   * Hover and pressed. A neutral gray laid over the surface, mixed in linear light both by
+   * Theme.over and by the renderer, so every component gives the same color: hover 4 L* or more
+   * from the surface, pressed 3 L* or more beyond hover. In the dark theme a lighter gray near the
+   * surfaces at 25 % and 45 %; in the light one a gray (L* 77) at 33 % and 57 %, which darkens the
+   * gray window by as much as the rules ask, as it does the white surfaces.
    *
    * Accent. One blue: white text on it at 4.5:1. Its edge, the tone of lines, outlines and the
    * focus ring, 3:1 on every surface and on the grid's selection: a lighter blue in the dark
@@ -1277,13 +1277,13 @@ public record Theme(
    * Text. Primary and muted at least 4.5:1 on every surface, band, hover, pressed and selection
    * they meet, also the window's hover and pressed; disabled from 2.5:1 to 3.5:1 on window, panel
    * and raised, legible but clearly below muted (in the light theme, whose window and raised
-   * surface are far apart, that leaves it little room). Status colours 4.5:1 on the surfaces and on the grid's selection.
+   * surface are far apart, that leaves it little room). Status colors 4.5:1 on the surfaces and on the grid's selection.
    *
    * Edges and marks. The strong border, the accent as a fill of what is on, the grid's cursor and
    * the scrollbar's thumb at rest at least 3:1 on the surfaces they lie on.
    *
    * Selection in lists. Focused: a calm tint of the accent, primary text at 9:1 or more. Without
-   * the focus: the same lightness with little colour, apart from the hover by 4 L* or more, and
+   * the focus: the same lightness with little color, apart from the hover by 4 L* or more, and
    * from every surface it lies on (window, panel, the grid's rows) at least as much as the dark
    * theme's cards stand out from its window.
    *
@@ -1296,28 +1296,28 @@ public record Theme(
    * Sizes and type. Controls 24, rows 24, text 13; radii 4 for small parts, 6 for controls, 10 for
    * cards; card titles 14, dialog titles 16, secondary text beside its subject 12; headings semibold, strong text, column titles and buttons medium.
    *
-   * Palette. Every colour is one of Palette's, named by its hue and its L* times ten, or one of
-   * them at an alpha: alpha(GREY_298, 0.25f) is the dark theme's hover. Tokens that share a colour
-   * name the same entry (in the dark theme the band and the grid's header are GREY_099, and the
+   * Palette. Every color is one of Palette's, named by its hue and its L* times ten, or one of
+   * them at an alpha: alpha(GRAY_298, 0.25f) is the dark theme's hover. Tokens that share a color
+   * name the same entry (in the dark theme the band and the grid's header are GRAY_099, and the
    * accent's edge, the grid's cursor, a link and the tint of a changed cell BLUE_694); a value
    * that no rule makes from another is an entry of its own, also where it is close to another.
    * The accents are those of Hue.BLUE; Hue's other accents follow the rules above in both themes.
    */
 
-  /** Neutral greys with a blue accent, light text on dark surfaces. */
+  /** Neutral grays with a blue accent, light text on dark surfaces. */
   public static final Theme DARK = new Theme(
       new Surfaces(
-          GREY_047,
-          GREY_083,
-          GREY_122,
-          GREY_099,
-          alpha(GREY_298, 0.25f),
-          alpha(GREY_298, 0.45f),
+          GRAY_047,
+          GRAY_083,
+          GRAY_122,
+          GRAY_099,
+          alpha(GRAY_298, 0.25f),
+          alpha(GRAY_298, 0.45f),
           alpha(BLACK, 0.6f),
-          GREY_157,
-          over(GREY_157, alpha(GREY_298, 0.36f))),
-      new TextColors(GREY_916, GREY_648, GREY_425, WHITE),
-      new Borders(GREY_157, GREY_501, GREY_226, alpha(GREY_477, 0.35f), GREY_226),
+          GRAY_157,
+          over(GRAY_157, alpha(GRAY_298, 0.36f))),
+      new TextColors(GRAY_916, GRAY_648, GRAY_425, WHITE),
+      new Borders(GRAY_157, GRAY_501, GRAY_226, alpha(GRAY_477, 0.35f), GRAY_226),
       Hue.BLUE.dark(),
       new Status(RED_649, AMBER_745, GREEN_735),
       SPACE,
@@ -1325,8 +1325,8 @@ public record Theme(
       TYPE,
       SIZE,
       MOTION,
-      new Grid(24, 32, 480, 6, 12, GREY_099, GREY_083, GREY_083, BLUE_180, GREY_208, BLUE_694, 1),
-      new Scrollbars(6, 2, 3, 24, GREY_568, GREY_655, GREY_759),
+      new Grid(24, 32, 480, 6, 12, GRAY_099, GRAY_083, GRAY_083, BLUE_180, GRAY_208, BLUE_694, 1),
+      new Scrollbars(6, 2, 3, 24, GRAY_568, GRAY_655, GRAY_759),
       new Elevation(
           List.of(
               new Shadow(0, 1, 2, 0, alpha(BLACK, 0.6f)),
@@ -1340,20 +1340,20 @@ public record Theme(
       Code.DARK,
       CAPTION);
 
-  /** Neutral greys with a blue accent, dark text on light surfaces. */
+  /** Neutral grays with a blue accent, dark text on light surfaces. */
   public static final Theme LIGHT = new Theme(
       new Surfaces(
-          GREY_927,
-          GREY_993,
+          GRAY_927,
+          GRAY_993,
           WHITE,
-          GREY_968,
-          alpha(GREY_773, 0.33f),
-          alpha(GREY_773, 0.57f),
+          GRAY_968,
+          alpha(GRAY_773, 0.33f),
+          alpha(GRAY_773, 0.57f),
           alpha(BLACK, 0.35f),
           WHITE,
-          over(WHITE, alpha(GREY_773, 0.57f))),
-      new TextColors(GREY_108, GREY_395, GREY_602, WHITE),
-      new Borders(GREY_912, GREY_547, GREY_844, alpha(GREY_547, 0.37f), GREY_805),
+          over(WHITE, alpha(GRAY_773, 0.57f))),
+      new TextColors(GRAY_108, GRAY_395, GRAY_602, WHITE),
+      new Borders(GRAY_912, GRAY_547, GRAY_844, alpha(GRAY_547, 0.37f), GRAY_805),
       Hue.BLUE.light(),
       new Status(RED_395, AMBER_384, GREEN_389),
       SPACE,
@@ -1361,12 +1361,12 @@ public record Theme(
       TYPE,
       SIZE,
       MOTION,
-      new Grid(24, 32, 480, 6, 12, GREY_968, WHITE, WHITE, BLUE_918, GREY_883, BLUE_447, 1),
-      new Scrollbars(6, 2, 3, 24, GREY_501, GREY_423, GREY_327),
+      new Grid(24, 32, 480, 6, 12, GRAY_968, WHITE, WHITE, BLUE_918, GRAY_883, BLUE_447, 1),
+      new Scrollbars(6, 2, 3, 24, GRAY_501, GRAY_423, GRAY_327),
       new Elevation(
           List.of(
-              new Shadow(0, 1, 2, 0, alpha(GREY_084, 0.16f)),
-              new Shadow(0, 2, 6, 0, alpha(GREY_084, 0.12f))),
+              new Shadow(0, 1, 2, 0, alpha(GRAY_084, 0.16f)),
+              new Shadow(0, 2, 6, 0, alpha(GRAY_084, 0.12f))),
           List.of(
               new Shadow(0, 1, 3, 0, alpha(BLACK, 0.25f)),
               new Shadow(0, 6, 16, 0, alpha(BLACK, 0.22f))),
@@ -1822,10 +1822,10 @@ public record Theme(
   }
 
   /**
-   * The colour {@code overlay} gives when laid over the opaque colour {@code base}, such as a
+   * The color {@code overlay} gives when laid over the opaque color {@code base}, such as a
    * control's background with the {@link Surfaces#hover} overlay on it: {@link Colors#over}. It
    * mixes in linear light, as the renderer blends a translucent fill, so a component that draws
-   * the overlay translucent and one that fills with this colour look the same.
+   * the overlay translucent and one that fills with this color look the same.
    */
   public static int over(int base, int overlay) {
     return Colors.over(base, overlay);

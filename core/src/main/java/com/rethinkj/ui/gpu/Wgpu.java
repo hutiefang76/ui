@@ -30,7 +30,7 @@ import java.util.Map;
  * <p>The library is loaded by the nested holder of the method handles, on the first call of a
  * function. {@link Instance#create} loads it through {@link Natives} before that, so a missing
  * library is an {@link UnsatisfiedLinkError} with an explanation rather than a failed class
- * initialisation. Constants, layouts and descriptors need no library.
+ * initialization. Constants, layouts and descriptors need no library.
  *
  * <p>wgpu-native does not implement 35 functions of {@code webgpu.h}: calling one ends the
  * process. Among them are {@code wgpuInstanceWaitAny}, every {@code SetLabel} and {@code
@@ -50,7 +50,7 @@ final class Wgpu {
   static final int MIP_LEVEL_COUNT_UNDEFINED = 0xFFFFFFFF;
   static final int ARRAY_LAYER_COUNT_UNDEFINED = 0xFFFFFFFF;
   static final int COPY_STRIDE_UNDEFINED = 0xFFFFFFFF;
-  /** {@code WGPU_DEPTH_SLICE_UNDEFINED}, which a colour attachment needs if its view is not 3D. */
+  /** {@code WGPU_DEPTH_SLICE_UNDEFINED}, which a color attachment needs if its view is not 3D. */
   static final int DEPTH_SLICE_UNDEFINED = 0xFFFFFFFF;
 
   // ---- enums -------------------------------------------------------------------------------
@@ -317,7 +317,7 @@ final class Wgpu {
       "wgpuRenderPassEncoderEnd", VOID_HANDLE,
       "wgpuRenderPassEncoderRelease", VOID_HANDLE);
 
-  /** The method handles; initialising this class loads the library. */
+  /** The method handles; initializing this class loads the library. */
   private static final class Fn {
     private static final SymbolLookup LIBRARY = Natives.lookup("wgpu_native");
 

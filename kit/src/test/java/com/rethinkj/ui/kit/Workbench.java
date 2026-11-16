@@ -217,7 +217,7 @@ final class Workbench {
 
   /**
    * Runs the script in {@code src/test/resources/scripts} with this name and compares each snap,
-   * or those named, with the stored image {@code <name>-<theme>-<snap>}, the theme named by its window colour.
+   * or those named, with the stored image {@code <name>-<theme>-<snap>}, the theme named by its window color.
    *
    * @return the number of snaps
    */
@@ -249,7 +249,7 @@ final class Workbench {
   }
 
   /** The first element with this label in tree order, or null. */
-  static El labelled(App<?> app, String label) {
+  static El labeled(App<?> app, String label) {
     return find(app.tree(), e -> label.equals(e.label()));
   }
 

@@ -13,7 +13,7 @@ import java.util.Objects;
 
 /**
  * Names and values in two columns, the details of a table, a column or a connection: the names
- * muted, the values in the text's colour or in the mono font. The names' column is as wide as the
+ * muted, the values in the text's color or in the mono font. The names' column is as wide as the
  * widest name, measured as {@link Form} measures its labels, up to {@link Theme.Sizes#field}, and
  * a longer name ends in an ellipsis. Each value is a read-only field that a press and a drag
  * select and Control+C copies, which Tab passes by; a value too long for its column wraps onto up
@@ -134,14 +134,14 @@ public final class Properties {
   private static El entry(
       Theme theme, Property p, float column, Clipboard clipboard, Button.Copied copied) {
     Theme.TextStyle style = p.isMono() ? theme.type().mono() : theme.type().body();
-    // The name centred beside the value's first line, as in a row one line high.
+    // The name centered beside the value's first line, as in a row one line high.
     El name = row()
         .h(theme.size().control())
         .shrink(0)
         .align(Style.Align.CENTER)
         .child(label(theme, Label.Variant.MUTED, p.name()).ellipsis().w(column).minSize(0, 0));
     // The padding leaves a line's room in a control's height: one line sits where a field of that
-    // height centres it, more lines grow the field downwards, the first beside the name.
+    // height centers it, more lines grow the field downwards, the first beside the name.
     El value = El.text(p.value())
         .editable(v -> {})
         .readOnly()

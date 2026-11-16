@@ -80,7 +80,7 @@ class GpuPresenterTest {
         assertTrue(animated > 3, "the knob moved over several frames: " + animated);
         assertFalse(gpu.pending());
         // The page once, then at most the glyph that "Lights on" has and "Lights off" lacks; the
-        // label's colour springs in the other frames, which upload nothing.
+        // label's color springs in the other frames, which upload nothing.
         long uploads = gpu.atlasUploads();
         assertTrue(uploads >= 1 && uploads <= 2, uploads + " uploads in " + animated + " frames");
 
@@ -135,7 +135,7 @@ class GpuPresenterTest {
 
         // The label comes to rest 60 and 30 pixels further, whole pixels at 1, 1.25, 1.5 and 2, so
         // its glyphs stay as they are. On its way its spring draws it between pixels, which from
-        // 1.5 on, where text lies on quarter pixels, would rasterise its glyphs anew.
+        // 1.5 on, where text lies on quarter pixels, would rasterize its glyphs anew.
         window.resize(320, 180);
         assertTrue(Desktop.pollUntil(() -> window.width() == 320), "resized");
         app.resize(window.width(), window.height(), window.scale());

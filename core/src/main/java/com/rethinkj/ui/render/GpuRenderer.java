@@ -36,8 +36,8 @@ import java.util.Set;
  * <p>The instances and the clip table go to the GPU as they are, as two read-only storage
  * buffers that the shader reads as {@code array<Instance>} and {@code array<Clip>} in the layout
  * {@link Scene} documents; one instanced draw call draws all instances in order, rectangles,
- * glyphs and shadows alike, one quad each. The colours stay linear and premultiplied: the shader
- * returns premultiplied linear colour, the pipeline blends with {@code one, one-minus-src-alpha},
+ * glyphs and shadows alike, one quad each. The colors stay linear and premultiplied: the shader
+ * returns premultiplied linear color, the pipeline blends with {@code one, one-minus-src-alpha},
  * and the target has an sRGB format, so the GPU blends in linear light and encodes to sRGB as it
  * stores.
  *
@@ -107,9 +107,9 @@ public final class GpuRenderer implements AutoCloseable {
         shape: vec2u,
         clip: u32,
         kind: u32,
-        // A rectangle's fill; a glyph's or a shadow's colour.
+        // A rectangle's fill; a glyph's or a shadow's color.
         fill: vec4f,
-        // A rectangle's border colour, f32; a glyph's page, and as f32 its light_share,
+        // A rectangle's border color, f32; a glyph's page, and as f32 its light_share,
         // dark_gamma and light_gamma.
         more: vec4u,
         // A rectangle's and a shadow's radii at the top right, bottom right and bottom left.
@@ -135,7 +135,7 @@ public final class GpuRenderer implements AutoCloseable {
       @group(0) @binding(2) var<storage, read> clips: array<Clip>;
       // The atlas pages, one layer each: 8-bit coverage, read texel by texel, never filtered.
       @group(0) @binding(3) var atlas: texture_2d_array<f32>;
-      // The image of the image instances drawn now: its levels, premultiplied colour encoded to
+      // The image of the image instances drawn now: its levels, premultiplied color encoded to
       // sRGB and linear alpha (rgba8unorm), read texel by texel, decoded and filtered here, as on
       // the CPU.
       @group(1) @binding(0) var image: texture_2d<f32>;
@@ -191,7 +191,7 @@ public final class GpuRenderer implements AutoCloseable {
           empty = !(instance.rect.z > 0.0 && instance.rect.w > 0.0);
         }
         // No further than a pixel beyond the target: the fragments are the same, and a quad that
-        // reaches a billion pixels out, as a scrim's, is one a software rasteriser may drop.
+        // reaches a billion pixels out, as a scrim's, is one a software rasterizer may drop.
         low = max(low, vec2f(-1.0));
         high = min(high, globals.size + 1.0);
         let corner = vec2f(f32(vertex & 1u), f32(vertex >> 1u));
@@ -206,7 +206,7 @@ public final class GpuRenderer implements AutoCloseable {
         return out;
       }
 
-      // Signed distance to a rounded rectangle centred on the origin; negative inside.
+      // Signed distance to a rounded rectangle centered on the origin; negative inside.
       fn distance(p: vec2f, half_size: vec2f, radius: f32) -> f32 {
         let q = abs(p) - half_size + radius;
         return min(max(q.x, q.y), 0.0) + length(max(q, vec2f(0.0))) - radius;
@@ -250,7 +250,7 @@ public final class GpuRenderer implements AutoCloseable {
         return clamp(0.5 - distance * globals.scale, 0.0, 1.0);
       }
 
-      // How much of the pixel centred at point, in logical pixels, the clip lets through: the
+      // How much of the pixel centered at point, in logical pixels, the clip lets through: the
       // least that it and each of its parents does by itself. A parent that does not come before
       // its entry ends the chain.
       fn clip_coverage(index: u32, point: vec2f) -> f32 {
@@ -299,9 +299,9 @@ public final class GpuRenderer implements AutoCloseable {
         return below(t + half, sigma) - below(t - half, sigma);
       }
 
-      // The blur of the quarter disc of radius r at the origin towards +x, +y, seen from u, v:
+      // The blur of the quarter disk of radius r at the origin towards +x, +y, seen from u, v:
       // within three deviations of v, in eight slices of equal height, each the Gaussian's exact
-      // mass across the slice times its mass along the disc at the slice's middle.
+      // mass across the slice times its mass along the disk at the slice's middle.
       fn quarter(u: f32, v: f32, r: f32, sigma: f32) -> f32 {
         let reach = 3.0 * sigma;
         let low = max(v - reach, 0.0);
@@ -324,8 +324,8 @@ public final class GpuRenderer implements AutoCloseable {
         return sum;
       }
 
-      // How much of a Gaussian of deviation sigma around p lies in a rounded rectangle centred on
-      // the origin: two crossed boxes, whose blur is exact, and the quarter discs at their
+      // How much of a Gaussian of deviation sigma around p lies in a rounded rectangle centered on
+      // the origin: two crossed boxes, whose blur is exact, and the quarter disks at their
       // corners.
       fn shadow(p: vec2f, half_size: vec2f, radius: f32, sigma: f32) -> f32 {
         let straight = half_size - radius;
@@ -344,7 +344,7 @@ public final class GpuRenderer implements AutoCloseable {
       }
 
       // The same with a radius per corner: the box, less each rounded corner's square, plus its
-      // quarter disc; the crossed boxes where all four are equal.
+      // quarter disk; the crossed boxes where all four are equal.
       fn shadow_corners(p: vec2f, half_size: vec2f, radii: vec4f, sigma: f32) -> f32 {
         if all(radii == vec4f(radii.x)) {
           return shadow(p, half_size, radii.x, sigma);
@@ -363,7 +363,7 @@ public final class GpuRenderer implements AutoCloseable {
         return min(cover, 1.0);
       }
 
-      // A texel of the image in linear light: its colour decoded from sRGB, its alpha as it is.
+      // A texel of the image in linear light: its color decoded from sRGB, its alpha as it is.
       fn image_texel(texel: vec2i, level: i32) -> vec4f {
         let t = textureLoad(image, texel, level);
         return vec4f(select(t.rgb / 12.92, pow((t.rgb + 0.055) / 1.055, vec3f(2.4)),
@@ -386,7 +386,7 @@ public final class GpuRenderer implements AutoCloseable {
         return mix(over, under, f.y);
       }
 
-      // The image's sample at the pixel centred at pixel, in physical pixels: one texel to one
+      // The image's sample at the pixel centered at pixel, in physical pixels: one texel to one
       // pixel, or trilinear from its levels, as Scene's Javadoc says.
       fn image_sample(instance: Instance, pixel: vec2f) -> vec4f {
         let size = vec2f(f32(instance.shape.x & 0xFFFFu), f32(instance.shape.x >> 16u));
@@ -416,7 +416,7 @@ public final class GpuRenderer implements AutoCloseable {
       @fragment
       fn fs_main(in: Varyings) -> @location(0) vec4f {
         let instance = instances[in.index];
-        // The pixel's centre, in logical pixels; the position is at the centre already.
+        // The pixel's center, in logical pixels; the position is at the center already.
         let point = in.position.xy / globals.scale;
         if instance.kind == GLYPH {
           // One texel to one physical pixel: the texel of this pixel, read as it is.
@@ -508,7 +508,7 @@ public final class GpuRenderer implements AutoCloseable {
   private static final TextureFormat ATLAS_FORMAT = TextureFormat.R8_UNORM;
 
   /**
-   * An image texture's format: the bytes of {@link Image}'s levels, premultiplied colour encoded
+   * An image texture's format: the bytes of {@link Image}'s levels, premultiplied color encoded
    * to sRGB and linear alpha, which the shader decodes with sRGB's formula. Not {@code
    * rgba8unorm-srgb}: a GPU may decode that with an error of up to half a step, which filtering
    * then shows; on an NVIDIA GTX 1070 with Vulkan, halving each of the 256 values after the GPU's
@@ -619,8 +619,8 @@ public final class GpuRenderer implements AutoCloseable {
   /**
    * Draws {@code scene} into a new image, as {@link CpuRenderer#render} does: the image starts
    * fully transparent, and comes back in sRGB with straight alpha. Where the image is translucent,
-   * the colour is divided by alpha after reading back, so a pixel with little alpha has coarse
-   * colour; an opaque pixel is exactly what the GPU stored.
+   * the color is divided by alpha after reading back, so a pixel with little alpha has coarse
+   * color; an opaque pixel is exactly what the GPU stored.
    *
    * @param width the width of the image in physical pixels
    * @param height the height of the image in physical pixels
@@ -655,7 +655,7 @@ public final class GpuRenderer implements AutoCloseable {
 
   /**
    * Draws {@code scene} into the renderer's texture and returns the bytes as the GPU stored them:
-   * sRGB-encoded premultiplied colour and linear alpha, {@link #bytesPerRow} bytes a row.
+   * sRGB-encoded premultiplied color and linear alpha, {@link #bytesPerRow} bytes a row.
    */
   byte[] renderStored(Scene scene, int width, int height, float scale) {
     checkOpen();

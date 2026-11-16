@@ -23,7 +23,7 @@ import java.util.function.Predicate;
 
 /**
  * A menu of items in an overlay: each with its text, an optional icon before it, an optional
- * shortcut at the right, a check mark when it is checked, greyed out when it is disabled, and
+ * shortcut at the right, a check mark when it is checked, grayed out when it is disabled, and
  * separators between groups. An item may open a submenu beside it, and the items of a submenu
  * submenus of their own, to any depth, after the pointer rests on it ({@link
  * Theme.Motion#submenuDelay}) or with Arrow Right. As a dropdown it hangs below a button, as a
@@ -145,7 +145,7 @@ public final class Menu {
     }
 
     /**
-     * This item with an element before its text, in place of an icon, such as a colour's swatch
+     * This item with an element before its text, in place of an icon, such as a color's swatch
      * ({@link HuePicker#swatch}): built for each place it shows, for the theme there, at most
      * {@link Theme.Sizes#icon} square, in the column the icons have, which keeps its width. While
      * the item is checked, the check mark stands at its end and the element before the text.
@@ -223,7 +223,7 @@ public final class Menu {
 
     /**
      * This item in the theme's danger tone ({@link Theme.Danger#text}), its icon too, highlighted
-     * or not, for an action that destroys something, such as Delete; disabled, it is greyed out
+     * or not, for an action that destroys something, such as Delete; disabled, it is grayed out
      * as any other item.
      */
     public Item danger() {
@@ -664,7 +664,7 @@ public final class Menu {
         .fill(fill)
         .onHoverFor(0, () -> state.highlight(level, i))
         .disabled(!enabled)
-        .current(lit) // the highlight, which a dump would otherwise show only as a colour
+        .current(lit) // the highlight, which a dump would otherwise show only as a color
         .child(content);
     if (item.checked()) {
       el.checked(true);

@@ -36,7 +36,7 @@ import java.util.List;
  *
  * <p>The library is loaded by the nested holder of the method handles, on the first call of a
  * function. Callers load it through {@link Natives} before that, so that a missing library is an
- * {@link UnsatisfiedLinkError} with an explanation rather than a failed class initialisation.
+ * {@link UnsatisfiedLinkError} with an explanation rather than a failed class initialization.
  */
 public final class FreeType {
 
@@ -49,7 +49,7 @@ public final class FreeType {
   // ---- constants ---------------------------------------------------------------------------
 
   public static final long FACE_FLAG_SCALABLE = 1L << 0;
-  /** {@code FT_FACE_FLAG_COLOR}: the face has colour glyphs (COLR, CBDT, sbix or SVG tables). */
+  /** {@code FT_FACE_FLAG_COLOR}: the face has color glyphs (COLR, CBDT, sbix or SVG tables). */
   public static final long FACE_FLAG_COLOR = 1L << 14;
 
   public static final long STYLE_FLAG_ITALIC = 1L << 0;
@@ -115,7 +115,7 @@ public final class FreeType {
       ADDRESS.withName("size"),
       ADDRESS.withName("charmap"));
 
-  /** {@code FT_GlyphSlotRec} up to {@code bitmap_top}, the fields a rasteriser reads. */
+  /** {@code FT_GlyphSlotRec} up to {@code bitmap_top}, the fields a rasterizer reads. */
   public static final StructLayout GLYPH_SLOT = struct(
       ADDRESS.withName("library"),
       ADDRESS.withName("face"),
@@ -194,7 +194,7 @@ public final class FreeType {
   public static final FunctionDescriptor GET_NEXT_CHAR =
       FunctionDescriptor.of(C_LONG, ADDRESS, C_LONG, ADDRESS);
 
-  /** The method handles; initialising this class loads the library. */
+  /** The method handles; initializing this class loads the library. */
   private static final class Fn {
     private static final SymbolLookup LIBRARY = Natives.lookup("freetype");
 

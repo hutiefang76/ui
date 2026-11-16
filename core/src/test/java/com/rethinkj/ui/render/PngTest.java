@@ -42,8 +42,8 @@ class PngTest {
   }
 
   /**
-   * Images that Pillow wrote, of every colour type and of 1, 4, 8 and 16 bits, filtered as it
-   * chose and with transparency by palette and by colour key, against the pixels Pillow reads.
+   * Images that Pillow wrote, of every color type and of 1, 4, 8 and 16 bits, filtered as it
+   * chose and with transparency by palette and by color key, against the pixels Pillow reads.
    */
   @ParameterizedTest
   @ValueSource(
@@ -63,7 +63,7 @@ class PngTest {
     Pixels read = Png.decode(resource(name + ".png"));
     assertEquals(13, read.width());
     assertEquals(7, read.height());
-    // Sixteen bits keep their high byte: the sixteen-bit grey was the eight-bit grey times 257.
+    // Sixteen bits keep their high byte: the sixteen-bit gray was the eight-bit gray times 257.
     assertArrayEquals(resource((name.equals("gray16") ? "gray8" : name) + ".rgba"), read.rgba());
   }
 

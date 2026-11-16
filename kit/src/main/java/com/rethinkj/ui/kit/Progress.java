@@ -17,9 +17,9 @@ import com.rethinkj.ui.Style;
  * <p>A bar is a track of {@link Theme.Sizes#progress} with round ends in {@link
  * Theme.Borders#control}, {@link Theme.Sizes#field} wide unless the view sets a width ({@code
  * .wFull()} or {@code .grow(1)} fills its row), and the part done in the accent's edge, the
- * colour of the lines the kit draws in the accent, which stands out 3:1 from the track in both
+ * color of the lines the kit draws in the accent, which stands out 3:1 from the track in both
  * themes; it follows the value with {@link Theme.Motion#move}. A {@link State} gives the part done
- * the danger, success or muted colour. A running bar ({@link #indeterminate}) has a piece that
+ * the danger, success or muted color. A running bar ({@link #indeterminate}) has a piece that
  * grows out of the track's start, sweeps along it and shrinks into its end, its front ahead of
  * its back, easing in and out, once per {@link Theme.Motion#progress} seconds ({@link El#cycle}):
  * a calm sweep, as Fluent's single sliding piece, with the stretch of Material's line. A bar and
@@ -42,9 +42,9 @@ public final class Progress {
   public enum State {
     /** It runs: the accent. */
     NORMAL,
-    /** It failed: the danger colour, and {@code invalid} in a dump. */
+    /** It failed: the danger color, and {@code invalid} in a dump. */
     ERROR,
-    /** It is done: the success colour. */
+    /** It is done: the success color. */
     DONE,
     /** It waits for the user or was paused: muted. */
     PAUSED
@@ -61,7 +61,7 @@ public final class Progress {
     return bar(theme, fraction, State.NORMAL);
   }
 
-  /** A bar with a value, coloured by what became of the work. */
+  /** A bar with a value, colored by what became of the work. */
   public static El bar(Theme theme, double fraction, State state) {
     return states(
             track(theme, theme.size().progress(), true, clamp(fraction), state), fraction, state)
@@ -98,7 +98,7 @@ public final class Progress {
   /**
    * A bar under its name, with a text at the right beside the name, in muted text with tabular
    * figures, so that numbers that change do not shake. The whole is the progress bar of a dump,
-   * labelled by the name.
+   * labeled by the name.
    *
    * @param detail such as "12.4 MB of 80 MB · 20 s left"; null for the percentage
    */
@@ -106,7 +106,7 @@ public final class Progress {
     return labeled(theme, label, fraction, detail, State.NORMAL);
   }
 
-  /** As {@link #labeled(Theme, String, double, String)}, coloured by what became of the work. */
+  /** As {@link #labeled(Theme, String, double, String)}, colored by what became of the work. */
   public static El labeled(Theme theme, String label, double fraction, String detail, State state) {
     Theme.TextStyle body = theme.type().body();
     El name = El.text(label)
@@ -132,7 +132,7 @@ public final class Progress {
         .label(label);
   }
 
-  /** A spinner of {@link Theme.Sizes#icon}, labelled "Loading". */
+  /** A spinner of {@link Theme.Sizes#icon}, labeled "Loading". */
   public static El spinner(Theme theme) {
     return spinner(theme, theme.size().icon());
   }
@@ -143,7 +143,7 @@ public final class Progress {
    * edge runs once per {@link Theme.Motion#spin} seconds. The core has no rotation and no arcs, so
    * the arc is four crescents, each the ring's box with a border on one side alone, which tapers
    * to nothing a quarter of a turn either way; their opacities follow the light round, each fading
-   * into the next, so it moves smoothly rather than from one spoke to the next. Labelled "Loading" unless the view sets
+   * into the next, so it moves smoothly rather than from one spoke to the next. Labeled "Loading" unless the view sets
    * another label.
    *
    * @param size the side, such as {@code size().icon()} for a button or a row
@@ -152,7 +152,7 @@ public final class Progress {
     return spinner(theme, size, theme.accent().edge(), theme.border().track());
   }
 
-  /** A spinner in other colours, as on a primary button. */
+  /** A spinner in other colors, as on a primary button. */
   static El spinner(Theme theme, float size, int arc, int ring) {
     float width = size / 8; // 2 at 16, the stroke of the icons drawn for 16
     double period = theme.motion().spin();
@@ -203,7 +203,7 @@ public final class Progress {
   private static El track(
       Theme theme, float thickness, boolean round, double fraction, State state) {
     float radius = round ? thickness / 2 : 0;
-    int colour = switch (state) {
+    int color = switch (state) {
       case NORMAL -> theme.accent().edge();
       case ERROR -> theme.status().danger();
       case DONE -> theme.status().success();
@@ -213,7 +213,7 @@ public final class Progress {
         .absolute(0, 0)
         .hFull()
         .radius(radius)
-        .fill(colour)
+        .fill(color)
         .motion(theme.motion().move());
     if (Double.isNaN(fraction)) {
       fill.wFull().cycle(theme.motion().progress(), (e, phase) -> {

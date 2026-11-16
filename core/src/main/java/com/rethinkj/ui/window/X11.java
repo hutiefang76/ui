@@ -143,7 +143,7 @@ final class X11 {
   }
 
   /**
-   * Has the X server fill what a resize uncovers with this colour, and keep what the window shows
+   * Has the X server fill what a resize uncovers with this color, and keep what the window shows
    * at its top left, until the app draws the new size.
    */
   static void background(MemorySegment display, long window, int rgb) {
@@ -194,7 +194,7 @@ final class X11 {
       try {
         counter = (long) Sync.CREATE_COUNTER_H.invokeExact(display, arena.allocate(SYNC_VALUE));
       } catch (LinkageError e) {
-        return 0; // no libXext; resizes stay unsynchronised
+        return 0; // no libXext; resizes stay unsynchronized
       }
       if (counter == 0) {
         return 0;

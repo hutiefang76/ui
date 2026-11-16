@@ -48,11 +48,11 @@ class TextRenderTest {
     }
   }
 
-  /** See {@link Examples#greyOnLight}. */
+  /** See {@link Examples#grayOnLight}. */
   @Test
-  void greyTextOnALightBackground() {
-    Headless.Frame frame = Headless.render(Examples.greyOnLight(), 480, 104, 2, PINNED);
-    Golden.assertMatches("text-grey-on-light", frame.pixels(), frame.tree());
+  void grayTextOnALightBackground() {
+    Headless.Frame frame = Headless.render(Examples.grayOnLight(), 480, 104, 2, PINNED);
+    Golden.assertMatches("text-gray-on-light", frame.pixels(), frame.tree());
   }
 
   @Test
@@ -147,7 +147,7 @@ class TextRenderTest {
    * Blending in linear light makes dark text on a light background thinner and light text on a
    * dark one heavier than blending the sRGB values, which is what text is designed for and what
    * platforms do. The correction pulls the ink back towards gamma space. Ink is the sum over the
-   * pixels of how far each moved from the background towards the text colour, in sRGB values: in
+   * pixels of how far each moved from the background towards the text color, in sRGB values: in
    * gamma space that is exactly the summed coverage. Eight lines of Inter and JetBrains Mono at 11
    * to 14 pixels, scale 1.
    *
@@ -155,9 +155,9 @@ class TextRenderTest {
    * white, where linear and gamma-space blending differ most, it comes within 2 % (measured: dark
    * on light 0.983, light on dark 0.990, against 0.736 and 1.232 without it), so 5 % is allowed.
    * As the contrast falls, the two ways of blending draw closer while the correction stays, so
-   * grey text ends up heavier than in gamma space: #999999 on white 1.149 (#6B6B6B 1.10, #AAAAAA
-   * 1.16). That is the side the rule prefers; corrected by the text colour alone, as light text,
-   * it would lose 29 % (0.709). So grey on light may be up to 20 % heavier, not lighter, and has
+   * gray text ends up heavier than in gamma space: #999999 on white 1.149 (#6B6B6B 1.10, #AAAAAA
+   * 1.16). That is the side the rule prefers; corrected by the text color alone, as light text,
+   * it would lose 29 % (0.709). So gray on light may be up to 20 % heavier, not lighter, and has
    * to be nearer than that wrong correction.
    */
   @Test
@@ -171,10 +171,10 @@ class TextRenderTest {
     assertEquals(1, lightOnDark, 0.05, "light on dark");
     assertEquals(1.23, inkRatio(0xFFDCDCDC, 0xFF1E1F22, linear, 0), 0.05, "without correction");
 
-    double greyOnLight = inkRatio(0xFF999999, 0xFFFFFFFF, PINNED, 0);
+    double grayOnLight = inkRatio(0xFF999999, 0xFFFFFFFF, PINNED, 0);
     double thinned = inkRatio(0xFF999999, 0xFFFFFFFF, PINNED, 0xFF000000); // told it is on black
-    assertTrue(greyOnLight >= 1 && greyOnLight < 1.2, "grey on light: " + greyOnLight);
-    assertTrue(Math.abs(thinned - 1) > greyOnLight - 1, "thinned: " + thinned);
+    assertTrue(grayOnLight >= 1 && grayOnLight < 1.2, "gray on light: " + grayOnLight);
+    assertTrue(Math.abs(thinned - 1) > grayOnLight - 1, "thinned: " + thinned);
   }
 
   /**
@@ -255,8 +255,8 @@ class TextRenderTest {
     assertTrue(x >= label.x() - 1 && x < label.x() + 2, "H starts at the label: " + x);
     assertEquals(0, scene.getInt(h, Scene.PAGE));
     assertEquals(1, scene.pages().size());
-    assertEquals(128 / 255f, scene.get(h, Scene.COLOUR), "white, premultiplied by its alpha");
-    assertEquals(128 / 255f, scene.get(h, Scene.COLOUR + 12));
+    assertEquals(128 / 255f, scene.get(h, Scene.COLOR), "white, premultiplied by its alpha");
+    assertEquals(128 / 255f, scene.get(h, Scene.COLOR + 12));
     assertEquals(1, scene.get(h, Scene.LIGHT_SHARE), "lighter than the black around it");
     assertEquals(1.8f, scene.get(h, Scene.DARK_GAMMA));
     assertEquals(1.8f, scene.get(h, Scene.LIGHT_GAMMA));
@@ -266,8 +266,8 @@ class TextRenderTest {
 
   @Test
   void theCorrectionFollowsTheBackgroundOrElseTheBiasedRule() {
-    assertEquals(0, share(el().fill(0xFFFFFFFF), 0xFF999999), "grey on white thickens");
-    assertEquals(1, share(el().fill(0xFF1E1F22), 0xFF999999), "grey on near black thins");
+    assertEquals(0, share(el().fill(0xFFFFFFFF), 0xFF999999), "gray on white thickens");
+    assertEquals(1, share(el().fill(0xFF1E1F22), 0xFF999999), "gray on near black thins");
     assertEquals(
         1,
         share(el().fill(0xFF000000).child(el().fill(0x40FFFFFF)), 0xFFA0A0A0),
@@ -286,8 +286,8 @@ class TextRenderTest {
     assertEquals(0, share(told, El.text("Hi").color(0xFFDCDCDC).textBackground(0xFFFFFFFF)));
   }
 
-  private static float share(El parent, int colour) {
-    return share(parent, El.text("Hi").color(colour));
+  private static float share(El parent, int color) {
+    return share(parent, El.text("Hi").color(color));
   }
 
   private static float share(El parent, El text) {
@@ -343,7 +343,7 @@ class TextRenderTest {
   // ---- motion --------------------------------------------------------------------------------
 
   @Test
-  void theColourOfTextSpringsAndLeavingTextFadesOut() {
+  void theColorOfTextSpringsAndLeavingTextFadesOut() {
     boolean[] on = {false};
     App<boolean[]> app = new App<>(on, s -> {
       El root = col()
@@ -366,15 +366,15 @@ class TextRenderTest {
     app.advance(0.05);
     app.frame();
     El status = app.tree().children().getFirst();
-    int grey = status.text().color() & 0xFF;
-    assertTrue(grey > 0x80 && grey < 0xFF, "between grey and white: " + grey);
+    int gray = status.text().color() & 0xFF;
+    assertTrue(gray > 0x80 && gray < 0xFF, "between gray and white: " + gray);
     El bye = app.tree().children().get(1);
     assertTrue(bye.isExiting());
     Scene scene = app.scene();
     float alpha = 0;
     for (int i = 0; i < scene.count(); i++) {
       if (scene.getInt(i, Scene.KIND) == Scene.GLYPH) {
-        alpha = scene.get(i, Scene.COLOUR + 12); // the last glyph is one of "Bye"
+        alpha = scene.get(i, Scene.COLOR + 12); // the last glyph is one of "Bye"
       }
     }
     assertTrue(alpha > 0 && alpha < 1, "fading: " + alpha);

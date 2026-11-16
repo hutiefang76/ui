@@ -117,7 +117,7 @@ final class ReferenceCpuRenderer {
 
     for (int py = top; py < bottom; py++) {
       for (int px = left; px < right; px++) {
-        // Distances are measured from the pixel's centre, in logical pixels.
+        // Distances are measured from the pixel's center, in logical pixels.
         double x = (px + 0.5) / scale - centerX;
         double y = (py + 0.5) / scale - centerY;
         double radius = radii[corner(x, y)];
@@ -142,7 +142,7 @@ final class ReferenceCpuRenderer {
           }
         }
         int at = (py * width + px) * 4;
-        // Alpha is the last channel, so it is still the old value while the colours are blended.
+        // Alpha is the last channel, so it is still the old value while the colors are blended.
         double alpha = mix(scene, i, 3, fillShare) * coverage;
         if (blends != null) {
           blends.blend(frame, at, alpha);
@@ -188,12 +188,12 @@ final class ReferenceCpuRenderer {
           continue;
         }
         int at = (py * width + px) * 4;
-        double alpha = scene.get(i, Scene.COLOUR + 12) * coverage;
+        double alpha = scene.get(i, Scene.COLOR + 12) * coverage;
         if (blends != null) {
           blends.blend(frame, at, alpha);
         }
         for (int c = 0; c < 4; c++) {
-          double source = scene.get(i, Scene.COLOUR + c * 4) * coverage;
+          double source = scene.get(i, Scene.COLOR + c * 4) * coverage;
           frame[at + c] = (float) (source + frame[at + c] * (1 - alpha));
         }
       }
@@ -322,7 +322,7 @@ final class ReferenceCpuRenderer {
     }
   }
 
-  /** A texel's channel in linear light: colour decoded from sRGB, alpha divided by 255. */
+  /** A texel's channel in linear light: color decoded from sRGB, alpha divided by 255. */
   private static double value(byte texel, int channel) {
     return channel == 3 ? (texel & 0xFF) / 255.0 : Scene.linear(texel & 0xFF);
   }
@@ -342,7 +342,7 @@ final class ReferenceCpuRenderer {
     double[] radii = radii(scene, i, halfW, halfH);
     double sigma = deviation(scene.get(i, Scene.SIGMA), scale);
     // The blur reaches three deviations beyond the shape, and one pixel more as for a rectangle.
-    // shortcut: what lies beyond, at most 0.14 % of the colour, is cut off, which a light glow on
+    // shortcut: what lies beyond, at most 0.14 % of the color, is cut off, which a light glow on
     // black shows as a faint edge; reach four deviations if glows need it.
     double reachW = halfW + 3 * sigma;
     double reachH = halfH + 3 * sigma;
@@ -391,13 +391,13 @@ final class ReferenceCpuRenderer {
     return StrictMath.sqrt(sigma * sigma + 1 / (12 * scale * scale));
   }
 
-  /** Slices of a quarter disc in {@link #quarter}. */
+  /** Slices of a quarter disk in {@link #quarter}. */
   private static final int SLICES = 8;
 
   /**
    * How much of a Gaussian of deviation {@code sigma} around the point {@code x, y} lies in a
-   * rounded rectangle centred on the origin: two crossed boxes, whose blur is exact, and the
-   * quarter discs at their corners.
+   * rounded rectangle centered on the origin: two crossed boxes, whose blur is exact, and the
+   * quarter disks at their corners.
    */
   static double shadow(
       double x, double y, double halfW, double halfH, double radius, double sigma) {
@@ -418,7 +418,7 @@ final class ReferenceCpuRenderer {
   }
 
   /**
-   * With a radius per corner: the box, less each rounded corner's square, plus its quarter disc;
+   * With a radius per corner: the box, less each rounded corner's square, plus its quarter disk;
    * as the crossed boxes where all four are equal.
    */
   static double shadow(
@@ -447,9 +447,9 @@ final class ReferenceCpuRenderer {
   }
 
   /**
-   * The blur of the quarter disc of radius {@code r} at the origin towards {@code +x, +y}, seen
+   * The blur of the quarter disk of radius {@code r} at the origin towards {@code +x, +y}, seen
    * from {@code u, v}: within three deviations of {@code v}, in slices of equal height, each the
-   * Gaussian's exact mass across the slice times its mass along the disc at the slice's middle.
+   * Gaussian's exact mass across the slice times its mass along the disk at the slice's middle.
    */
   private static double quarter(double u, double v, double r, double sigma) {
     double reach = 3 * sigma;
@@ -500,7 +500,7 @@ final class ReferenceCpuRenderer {
   }
 
   /**
-   * How much of the pixel centred at {@code x, y}, in logical pixels, the clip lets through: the
+   * How much of the pixel centered at {@code x, y}, in logical pixels, the clip lets through: the
    * least that it and each of its parents does by itself, as long as a parent comes before its
    * entry.
    */
@@ -542,7 +542,7 @@ final class ReferenceCpuRenderer {
   }
 
   /**
-   * Signed distance to a rounded rectangle centred on the origin whose corner on the point's side
+   * Signed distance to a rounded rectangle centered on the origin whose corner on the point's side
    * has the radius {@code rx} across and {@code ry} from top to bottom; negative inside.
    */
   private static double distance(
@@ -568,14 +568,14 @@ final class ReferenceCpuRenderer {
         + StrictMath.sqrt(outsideX * outsideX + outsideY * outsideY);
   }
 
-  /** One channel of the instance's colour: the border colour, or the fill where the fill shows. */
+  /** One channel of the instance's color: the border color, or the fill where the fill shows. */
   private static double mix(Scene scene, int i, int channel, double fillShare) {
     double fill = scene.get(i, Scene.FILL + channel * 4);
     double edge = scene.get(i, Scene.BORDER + channel * 4);
     return edge + (fill - edge) * fillShare;
   }
 
-  /** Signed distance to a rounded rectangle centred on the origin; negative inside. */
+  /** Signed distance to a rounded rectangle centered on the origin; negative inside. */
   private static double distance(double x, double y, double halfW, double halfH, double radius) {
     double qx = Math.abs(x) - halfW + radius;
     double qy = Math.abs(y) - halfH + radius;

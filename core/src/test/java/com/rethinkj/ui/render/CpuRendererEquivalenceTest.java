@@ -54,7 +54,7 @@ class CpuRendererEquivalenceTest {
   @Test
   void drawsImagesAsBefore() {
     Image photo = Image.of(Examples.photo(37, 23));
-    Image disc = Image.of(Examples.disc(20));
+    Image disk = Image.of(Examples.disk(20));
     for (float scale : new float[] {1.25f, 2}) {
       for (float size : new float[] {37, 9.25f, 1.5f, 120}) {
         for (float at : new float[] {3, 3.25f}) {
@@ -67,12 +67,12 @@ class CpuRendererEquivalenceTest {
                       .size(size, 20)
                       .radius(3, 0, 6, 1)
                       .fit(Image.Fit.COVER),
-                  El.image(disc)
+                  El.image(disk)
                       .absolute(at + 70, 30)
                       .size(size, size / 2)
                       .fit(Image.Fit.CONTAIN)
                       .opacity(0.6f),
-                  El.image(disc).absolute(at + 100, at).size(size / 2, size).radius(5));
+                  El.image(disk).absolute(at + 100, at).size(size / 2, size).radius(5));
           Flex.layout(root, 140, 60);
           assertSame(
               "images " + size + " at " + at + " @" + scale,
@@ -133,7 +133,7 @@ class CpuRendererEquivalenceTest {
    * Hundreds of small scenes of random instances: rectangles, shadows, images and, where the
    * text libraries load, glyphs, at fractional and whole positions and sizes, with radii from below 0
    * to beyond half the size, alike or each corner its own, borders up to beyond it, alike or each
-   * side its own, translucent and opaque colours, the clips of
+   * side its own, translucent and opaque colors, the clips of
    * nested rounded boxes, and now and then a value that is not finite.
    */
   @Test
@@ -259,9 +259,9 @@ class CpuRendererEquivalenceTest {
     return scene;
   }
 
-  /** Images for the random scenes: a photo with levels down to 1 by 1, and a disc with alpha. */
+  /** Images for the random scenes: a photo with levels down to 1 by 1, and a disk with alpha. */
   private static final Image[] BASE_IMAGES = {
-    Image.of(Examples.photo(29, 11)), Image.of(Examples.disc(12))
+    Image.of(Examples.photo(29, 11)), Image.of(Examples.disk(12))
   };
 
   /**
@@ -321,7 +321,7 @@ class CpuRendererEquivalenceTest {
         at + Scene.CLIP,
         random.nextInt(3) == 0 ? 0 : random.nextInt(scene.clipCount()));
     data.set(ValueLayout.JAVA_INT, at + Scene.KIND, kind);
-    colour(data, at + Scene.FILL, random);
+    color(data, at + Scene.FILL, random);
     if (kind == Scene.GLYPH) {
       int[] glyph = glyphs.get(random.nextInt(glyphs.size()));
       data.set(ValueLayout.JAVA_INT, at + Scene.ATLAS, glyph[0]);
@@ -358,7 +358,7 @@ class CpuRendererEquivalenceTest {
         }) {
       put(data, at + field, alike ? border : border(random, half));
     }
-    colour(data, at + Scene.BORDER, random);
+    color(data, at + Scene.BORDER, random);
   }
 
   /** A corner's radius: 0, half the shorter side, beyond it, below 0 or between. */
@@ -409,7 +409,7 @@ class CpuRendererEquivalenceTest {
   }
 
   /** Premultiplied: opaque, translucent or transparent. */
-  private static void colour(MemorySegment data, long at, Random random) {
+  private static void color(MemorySegment data, long at, Random random) {
     float alpha = switch (random.nextInt(4)) {
       case 0, 1 -> 1;
       case 2 -> 0;

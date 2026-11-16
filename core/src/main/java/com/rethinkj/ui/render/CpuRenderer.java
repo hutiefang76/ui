@@ -140,8 +140,8 @@ public final class CpuRenderer {
       return;
     }
     boolean clipWhole = clip != null && clip.coversWhole(left, top, right - 1, bottom - 1, scale);
-    double[] fill = colour(scene, i, Scene.FILL);
-    double[] edge = colour(scene, i, Scene.BORDER);
+    double[] fill = color(scene, i, Scene.FILL);
+    double[] edge = color(scene, i, Scene.BORDER);
     // The source of a pixel covered whole: as in blend below, with coverage 1 and a fill share
     // of 0, in the border, or 1.
     double[][] whole = new double[2][4];
@@ -158,7 +158,7 @@ public final class CpuRenderer {
     for (int py = top; py < bottom; py++) {
       double y = (py + 0.5) / scale;
       // A row that the fill reaches nowhere, as along a border at the top or the bottom, has
-      // runs of pixels in the border colour; any other its runs in the fill.
+      // runs of pixels in the border color; any other its runs in the fill.
       int share = border && (inner == null || inner.missesRow(y, left, right, scale)) ? 0 : 1;
       // Measures from the left until a pixel is covered whole, by the shape and the clip, with
       // that fill share, then from the right until one is: the pixels between are covered whole
@@ -273,7 +273,7 @@ public final class CpuRenderer {
         null);
   }
 
-  /** Blends the rectangle's colour over a pixel it covers this much of. */
+  /** Blends the rectangle's color over a pixel it covers this much of. */
   private static void blend(
       float[] frame,
       int at,
@@ -296,7 +296,7 @@ public final class CpuRenderer {
   }
 
   /**
-   * The coverage and the fill share of pixel {@code px} in the row whose centres lie at {@code y},
+   * The coverage and the fill share of pixel {@code px} in the row whose centers lie at {@code y},
    * into {@code coverages[px]} and {@code fillShares[px]}; whether the coverage is exactly 1 and
    * the fill share exactly {@code share}.
    */
@@ -312,7 +312,7 @@ public final class CpuRenderer {
       double[] coverages,
       double[] fillShares,
       int share) {
-    // Distances are measured from the pixel's centre, in logical pixels.
+    // Distances are measured from the pixel's center, in logical pixels.
     double x = (px + 0.5) / scale;
     double coverage = shape.coverage(x, y, scale);
     if (clip != null) {
@@ -345,7 +345,7 @@ public final class CpuRenderer {
     int left = Math.clamp(Math.round(scene.get(i, Scene.X) * scale), -0x10000, width);
     int top = Math.clamp(Math.round(scene.get(i, Scene.Y) * scale), -0x10000, height);
     double[] corrected = corrections(scene, i, scratch);
-    double[] colour = colour(scene, i, Scene.COLOUR);
+    double[] color = color(scene, i, Scene.COLOR);
     Box clip = Box.clip(scene, scene.getInt(i, Scene.CLIP));
     // The pixels the loop below draws into; left + tx never wraps into the image.
     boolean clipWhole = clip != null
@@ -376,10 +376,10 @@ public final class CpuRenderer {
         blend(
             frame,
             (py * width + px) * 4,
-            colour[0] * coverage,
-            colour[1] * coverage,
-            colour[2] * coverage,
-            colour[3] * coverage,
+            color[0] * coverage,
+            color[1] * coverage,
+            color[2] * coverage,
+            color[3] * coverage,
             blends);
       }
     }
@@ -459,7 +459,7 @@ public final class CpuRenderer {
       return;
     }
     boolean clipWhole = clip != null && clip.coversWhole(left, top, right - 1, bottom - 1, scale);
-    double[] colour = colour(scene, i, Scene.FILL);
+    double[] color = color(scene, i, Scene.FILL);
     Sampler sampler = new Sampler(scene, i, scale);
     double[] coverages = scratch.coverage;
     double[] fillShares = scratch.fillShare;
@@ -488,10 +488,10 @@ public final class CpuRenderer {
         blend(
             frame,
             (row + px) * 4,
-            colour[0] * sample[0] * coverage,
-            colour[1] * sample[1] * coverage,
-            colour[2] * sample[2] * coverage,
-            colour[3] * sample[3] * coverage,
+            color[0] * sample[0] * coverage,
+            color[1] * sample[1] * coverage,
+            color[2] * sample[2] * coverage,
+            color[3] * sample[3] * coverage,
             blends);
       }
     }
@@ -597,7 +597,7 @@ public final class CpuRenderer {
       }
     }
 
-    /** A texel's channel: colour decoded from sRGB, alpha divided by 255. */
+    /** A texel's channel: color decoded from sRGB, alpha divided by 255. */
     private static double value(byte[] texels, int at, int channel) {
       int b = texels[at] & 0xFF;
       return channel == 3 ? b / 255.0 : Scene.linear(b);
@@ -627,7 +627,7 @@ public final class CpuRenderer {
     double radius = radii[0];
     double sigma = deviation(scene.get(i, Scene.SIGMA), scale);
     // The blur reaches three deviations beyond the shape, and one pixel more as for a rectangle.
-    // shortcut: what lies beyond, at most 0.14 % of the colour, is cut off, which a light glow on
+    // shortcut: what lies beyond, at most 0.14 % of the color, is cut off, which a light glow on
     // black shows as a faint edge; reach four deviations if glows need it.
     double reachW = halfW + 3 * sigma;
     double reachH = halfH + 3 * sigma;
@@ -649,11 +649,11 @@ public final class CpuRenderer {
     }
     Box clip = Box.clip(scene, clipIndex);
     boolean clipWhole = clip != null && clip.coversWhole(left, top, right - 1, bottom - 1, scale);
-    double[] colour = colour(scene, i, Scene.FILL);
+    double[] color = color(scene, i, Scene.FILL);
     if (!(radii[1] == radius && radii[2] == radius && radii[3] == radius)) {
       corners(
           centerX, centerY, halfW, halfH, radii, sigma, left, top, right, bottom, clip, clipWhole,
-          colour, frame, width, scale, blends, scratch);
+          color, frame, width, scale, blends, scratch);
       return;
     }
     double straightW = halfW - radius;
@@ -685,10 +685,10 @@ public final class CpuRenderer {
         blend(
             frame,
             (py * width + px) * 4,
-            colour[0] * coverage,
-            colour[1] * coverage,
-            colour[2] * coverage,
-            colour[3] * coverage,
+            color[0] * coverage,
+            color[1] * coverage,
+            color[2] * coverage,
+            color[3] * coverage,
             blends);
       }
     }
@@ -696,7 +696,7 @@ public final class CpuRenderer {
 
   /**
    * Draws a shadow whose corners have different radii: the box, less each rounded corner's square,
-   * plus its quarter disc. What depends on x alone is computed once per column, what depends on y
+   * plus its quarter disk. What depends on x alone is computed once per column, what depends on y
    * once per row.
    */
   private static void corners(
@@ -712,7 +712,7 @@ public final class CpuRenderer {
       int bottom,
       Box clip,
       boolean clipWhole,
-      double[] colour,
+      double[] color,
       float[] frame,
       int width,
       double scale,
@@ -759,10 +759,10 @@ public final class CpuRenderer {
         blend(
             frame,
             (py * width + px) * 4,
-            colour[0] * coverage,
-            colour[1] * coverage,
-            colour[2] * coverage,
-            colour[3] * coverage,
+            color[0] * coverage,
+            color[1] * coverage,
+            color[2] * coverage,
+            color[3] * coverage,
             blends);
       }
     }
@@ -800,13 +800,13 @@ public final class CpuRenderer {
     return StrictMath.sqrt(sigma * sigma + 1 / (12 * scale * scale));
   }
 
-  /** Slices of a quarter disc in {@link #quarter}. */
+  /** Slices of a quarter disk in {@link #quarter}. */
   private static final int SLICES = 8;
 
   /**
    * How much of a Gaussian of deviation {@code sigma} around the point {@code x, y} lies in a
-   * rounded rectangle centred on the origin: two crossed boxes, whose blur is exact, and the
-   * quarter discs at their corners.
+   * rounded rectangle centered on the origin: two crossed boxes, whose blur is exact, and the
+   * quarter disks at their corners.
    */
   static double shadow(
       double x, double y, double halfW, double halfH, double radius, double sigma) {
@@ -858,9 +858,9 @@ public final class CpuRenderer {
   }
 
   /**
-   * The blur of the quarter disc of radius {@code r} at the origin towards {@code +x, +y}, seen
+   * The blur of the quarter disk of radius {@code r} at the origin towards {@code +x, +y}, seen
    * from {@code u, v}: within three deviations of {@code v}, in slices of equal height, each the
-   * Gaussian's exact mass across the slice times its mass along the disc at the slice's middle.
+   * Gaussian's exact mass across the slice times its mass along the disk at the slice's middle.
    * What depends on {@code v} alone comes as its {@link #slices}.
    */
   private static double quarter(double u, double[] slices, double r, double sigma) {
@@ -878,8 +878,8 @@ public final class CpuRenderer {
 
   /**
    * What {@link #quarter} needs of {@code v}, which it shares with a row of pixels: for each slice,
-   * the disc's extent at its middle and the Gaussian's mass across it, {@code (P(top - v) -
-   * P(bottom - v))}; or null when no part of the disc's height lies within three deviations.
+   * the disk's extent at its middle and the Gaussian's mass across it, {@code (P(top - v) -
+   * P(bottom - v))}; or null when no part of the disk's height lies within three deviations.
    */
   private static double[] slices(double v, double r, double sigma) {
     double reach = 3 * sigma;
@@ -929,9 +929,9 @@ public final class CpuRenderer {
   }
 
   /**
-   * A rounded rectangle, an instance's shape or a clip, by its centre, half size and the radii of
+   * A rounded rectangle, an instance's shape or a clip, by its center, half size and the radii of
    * its corners in logical pixels, top left, top right, bottom right, bottom left, across ({@code
-   * rx}) and from top to bottom ({@code ry}); the corner on a point's side of the centre ({@code x
+   * rx}) and from top to bottom ({@code ry}); the corner on a point's side of the center ({@code x
    * > 0} right, {@code y > 0} below) gives its distance. Only the fill of a border whose sides
    * differ has corners whose two radii differ.
    *
@@ -939,14 +939,14 @@ public final class CpuRenderer {
    * the coverage of each: in a row of pixels they are one run without gaps, and a box of pixels
    * whose four corners they include lies among them. That holds for the coverage as computed in
    * doubles, not only for the exact one, because every step of it is monotonic and IEEE rounding
-   * keeps that: the offset {@code x} of the pixel's centre {@code (px + 0.5) / scale} from the
-   * centre grows with {@code px}; {@link CpuRenderer#distance} grows with {@code |x|}, as each of
+   * keeps that: the offset {@code x} of the pixel's center {@code (px + 0.5) / scale} from the
+   * center grows with {@code px}; {@link CpuRenderer#distance} grows with {@code |x|}, as each of
    * its additions, maxima, minima, squares of values of 0 or more and its square root does; and
    * {@link CpuRenderer#coverage}, {@code 0.5 - distance * scale} clamped, shrinks as the distance
    * grows when {@code scale > 0}. A pixel between two others of its row has an {@code |x|} no
    * larger than the larger of theirs, so a coverage no smaller than the smaller of theirs: 1 if
    * both have 1. The same holds for {@code |y|} in a column, so in a box the corner farthest from
-   * the centre on both axes has the smallest coverage. With a radius per corner that holds in
+   * the center on both axes has the smallest coverage. With a radius per corner that holds in
    * each quadrant, and a pixel between two others of its row lies on the side of one of them with
    * an {@code |x|} no larger than its, as the corner of a box on its side does on both axes. A
    * product of coverages, each from 0 to 1, is 1 only where each is, so the pixels that several
@@ -1009,7 +1009,7 @@ public final class CpuRenderer {
     }
 
     /**
-     * How much of the pixel centred at {@code x, y}, in logical pixels, the box covers, and the
+     * How much of the pixel centered at {@code x, y}, in logical pixels, the box covers, and the
      * clips it lies in.
      */
     double coverage(double x, double y, double scale) {
@@ -1020,7 +1020,7 @@ public final class CpuRenderer {
       return cover;
     }
 
-    /** How much of the pixel centred at {@code x, y} the box covers by itself. */
+    /** How much of the pixel centered at {@code x, y} the box covers by itself. */
     private double own(double x, double y, double scale) {
       double dx = x - centerX;
       double dy = y - centerY;
@@ -1030,11 +1030,11 @@ public final class CpuRenderer {
 
     /**
      * Whether it covers none of the pixels from {@code left} to {@code right - 1} in the row whose
-     * centres lie at {@code y}: in a row, the coverage is largest at the pixels nearest the centre
-     * on either side (see above), which are among the four around where the centre falls.
+     * centers lie at {@code y}: in a row, the coverage is largest at the pixels nearest the center
+     * on either side (see above), which are among the four around where the center falls.
      */
     boolean missesRow(double y, int left, int right, double scale) {
-      // Clamped before the cast, so that a centre far outside cannot overflow the loop below.
+      // Clamped before the cast, so that a center far outside cannot overflow the loop below.
       int middle = (int) Math.clamp(Math.floor(centerX * scale - 0.5), left - 1, right);
       for (int px = middle - 1; px <= middle + 2; px++) {
         if (coverage((Math.clamp(px, left, right - 1) + 0.5) / scale, y, scale) != 0) {
@@ -1060,16 +1060,16 @@ public final class CpuRenderer {
     }
   }
 
-  /** The four channels of the colour at {@code field} of instance {@code i}. */
-  private static double[] colour(Scene scene, int i, int field) {
-    double[] colour = new double[4];
+  /** The four channels of the color at {@code field} of instance {@code i}. */
+  private static double[] color(Scene scene, int i, int field) {
+    double[] color = new double[4];
     for (int c = 0; c < 4; c++) {
-      colour[c] = scene.get(i, field + c * 4);
+      color[c] = scene.get(i, field + c * 4);
     }
-    return colour;
+    return color;
   }
 
-  /** One channel of the instance's colour: the border colour, or the fill where the fill shows. */
+  /** One channel of the instance's color: the border color, or the fill where the fill shows. */
   private static double mix(double fill, double edge, double fillShare) {
     return edge + (fill - edge) * fillShare;
   }
@@ -1080,7 +1080,7 @@ public final class CpuRenderer {
    */
   private static void blend(
       float[] frame, int at, double red, double green, double blue, double alpha, Blends blends) {
-    // Alpha is the last channel, so it is still the old value while the colours are blended.
+    // Alpha is the last channel, so it is still the old value while the colors are blended.
     if (blends != null) {
       blends.blend(frame, at, alpha);
     }
@@ -1096,7 +1096,7 @@ public final class CpuRenderer {
   }
 
   /**
-   * Signed distance to a rounded rectangle centred on the origin whose corner on the point's side
+   * Signed distance to a rounded rectangle centered on the origin whose corner on the point's side
    * has the radius {@code rx} across and {@code ry} from top to bottom; negative inside. An elliptic
    * corner's is the first-order distance, as {@link Scene} says.
    */
@@ -1123,7 +1123,7 @@ public final class CpuRenderer {
         + StrictMath.sqrt(outsideX * outsideX + outsideY * outsideY);
   }
 
-  /** Signed distance to a rounded rectangle centred on the origin; negative inside. */
+  /** Signed distance to a rounded rectangle centered on the origin; negative inside. */
   private static double distance(double x, double y, double halfW, double halfH, double radius) {
     double qx = Math.abs(x) - halfW + radius;
     double qy = Math.abs(y) - halfH + radius;
@@ -1213,7 +1213,7 @@ public final class CpuRenderer {
 
   /**
    * {@link #encode(double)}, remembered by the bits of the value, as a pixel's bytes are: the
-   * channels of a grey are one value, and a gradient repeats its values along a row or a column.
+   * channels of a gray are one value, and a gradient repeats its values along a row or a column.
    */
   private static final class Encoder {
     private static final int BITS = 12;

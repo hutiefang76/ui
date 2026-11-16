@@ -27,13 +27,13 @@ The handlers open and close the menu by changing the state:
 
 An overlay is at most as large as the window minus its margins, and one at the window's edge also minus its gap from that edge, so `margin(16)` keeps a dialog 16 pixels from the window's edges; if it has a scroll area that can shrink, that area scrolls. Where it does not fit, it flips to the other side, then moves into the window. It follows its anchor as it scrolls, and hides (staying open) while the anchor is out of view.
 
-## Behaviour
+## Behavior
 
 | Call | |
 | --- | --- |
 | `onDismiss(handler)` | A press outside, or the wheel outside a non-modal overlay. Overlays without one let presses through, as a tooltip. |
 | `modal()` | Input outside reaches nothing; Tab stays inside |
-| `scrim(argb)` | A colour over the window below it |
+| `scrim(argb)` | A color over the window below it |
 | `keepFocus()` | Opens without taking the focus, as a toast |
 | `dismissGroup(group)` | Presses on elements of the same group do not dismiss it: a menu bar's titles |
 | `onShownFor(seconds, handler)` | Runs once it has been open that long: a toast closes itself |

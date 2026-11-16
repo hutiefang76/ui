@@ -32,7 +32,7 @@ public final class Png {
 
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     out.writeBytes(SIGNATURE);
-    // 8 bits per channel, colour type 6 (RGBA), default compression and filter, not interlaced.
+    // 8 bits per channel, color type 6 (RGBA), default compression and filter, not interlaced.
     chunk(
         out,
         "IHDR",
@@ -47,7 +47,7 @@ public final class Png {
   }
 
   /**
-   * Reads a PNG file into straight RGBA: grey, grey with alpha, RGB, RGBA and palette images, of
+   * Reads a PNG file into straight RGBA: gray, gray with alpha, RGB, RGBA and palette images, of
    * 1, 2, 4, 8 or 16 bits per sample as the format allows them, with the transparency of a {@code
    * tRNS} chunk, all five row filters and the CRC of every chunk checked. Sixteen bits keep their
    * high byte. Interlaced images are refused, as are images of more than 2^28 pixels.
@@ -63,7 +63,7 @@ public final class Png {
     int width = -1;
     int height = -1;
     int depth = 0;
-    int colour = 0;
+    int color = 0;
     byte[] palette = null;
     byte[] transparency = null;
     ByteArrayOutputStream compressed = new ByteArrayOutputStream();
@@ -90,7 +90,7 @@ public final class Png {
           width = header.getInt();
           height = header.getInt();
           depth = header.get();
-          colour = header.get();
+          color = header.get();
           if (header.get() != 0 || header.get() != 0) {
             throw new IllegalArgumentException("unknown PNG compression or filter method");
           }
@@ -106,7 +106,7 @@ public final class Png {
             throw new IllegalArgumentException("PNG of " + Integer.toUnsignedString(width) + " by "
                 + Integer.toUnsignedString(height) + " pixels is too large");
           }
-          boolean known = switch (colour) {
+          boolean known = switch (color) {
             case 0 -> depth == 1 || depth == 2 || depth == 4 || depth == 8 || depth == 16;
             case 3 -> depth == 1 || depth == 2 || depth == 4 || depth == 8;
             case 2, 4, 6 -> depth == 8 || depth == 16;
@@ -114,7 +114,7 @@ public final class Png {
           };
           if (!known) {
             throw new IllegalArgumentException(
-                "PNG colour type " + colour + " with " + depth + " bits per sample is not valid");
+                "PNG color type " + color + " with " + depth + " bits per sample is not valid");
           }
         }
         case "PLTE" -> palette = data;
@@ -131,10 +131,10 @@ public final class Png {
     if (width < 0) {
       throw new IllegalArgumentException("PNG without IHDR chunk");
     }
-    if (colour == 3 && palette == null) {
+    if (color == 3 && palette == null) {
       throw new IllegalArgumentException("PNG palette image without PLTE chunk");
     }
-    int channels = switch (colour) {
+    int channels = switch (color) {
       case 2 -> 3;
       case 4 -> 2;
       case 6 -> 4;
@@ -156,7 +156,7 @@ public final class Png {
       int at = y * (rowBytes + 1);
       unfilter(raw[at], raw, at + 1, row, previous, bytesPerPixel);
       for (int x = 0; x < width; x++) {
-        pixel(row, x, depth, colour, palette, transparency, rgba, (y * width + x) * 4);
+        pixel(row, x, depth, color, palette, transparency, rgba, (y * width + x) * 4);
       }
       byte[] swap = previous;
       previous = row;
@@ -214,17 +214,17 @@ public final class Png {
       byte[] row,
       int x,
       int depth,
-      int colour,
+      int color,
       byte[] palette,
       byte[] transparency,
       byte[] out,
       int at) {
-    switch (colour) {
+    switch (color) {
       case 3 -> {
         int index = sample(row, x, depth);
         if (index * 3 + 2 >= palette.length) {
           throw new IllegalArgumentException("PNG pixel with palette index " + index
-              + " beyond the palette's " + palette.length / 3 + " colours");
+              + " beyond the palette's " + palette.length / 3 + " colors");
         }
         out[at] = palette[index * 3];
         out[at + 1] = palette[index * 3 + 1];
@@ -233,29 +233,29 @@ public final class Png {
             transparency != null && index < transparency.length ? transparency[index] : (byte) 0xFF;
       }
       case 0, 4 -> {
-        int grey = sample(row, x * (colour == 4 ? 2 : 1), depth);
-        byte value = (byte) eight(grey, depth);
+        int gray = sample(row, x * (color == 4 ? 2 : 1), depth);
+        byte value = (byte) eight(gray, depth);
         out[at] = value;
         out[at + 1] = value;
         out[at + 2] = value;
-        if (colour == 4) {
+        if (color == 4) {
           out[at + 3] = (byte) eight(sample(row, x * 2 + 1, depth), depth);
         } else {
           boolean keyed = transparency != null
               && transparency.length >= 2
-              && grey == ((transparency[0] & 0xFF) << 8 | transparency[1] & 0xFF);
+              && gray == ((transparency[0] & 0xFF) << 8 | transparency[1] & 0xFF);
           out[at + 3] = keyed ? 0 : (byte) 0xFF;
         }
       }
       default -> { // 2: RGB, 6: RGBA
-        int n = colour == 6 ? 4 : 3;
+        int n = color == 6 ? 4 : 3;
         int r = sample(row, x * n, depth);
         int g = sample(row, x * n + 1, depth);
         int b = sample(row, x * n + 2, depth);
         out[at] = (byte) eight(r, depth);
         out[at + 1] = (byte) eight(g, depth);
         out[at + 2] = (byte) eight(b, depth);
-        if (colour == 6) {
+        if (color == 6) {
           out[at + 3] = (byte) eight(sample(row, x * n + 3, depth), depth);
         } else {
           boolean keyed = transparency != null
