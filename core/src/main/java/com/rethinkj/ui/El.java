@@ -164,6 +164,7 @@ public final class El {
   private double hoverDelay;
   private Object dismissGroup; // see #dismissGroup
   private boolean keepsFocus; // see #keepFocus
+  private boolean inert; // see #inert
   private boolean holdsFocus; // see #holdFocus
   private Consumer<El> focusRestLook; // see #whenFocusVisibleFor
   private double focusRestDelay;
@@ -2252,7 +2253,10 @@ public final class El {
    * Changes how this element looks once the pointer has rested over it, or over elements inside
    * it, for {@code seconds} of the app's clock, until the pointer leaves it or presses: a tooltip,
    * which the look attaches as an {@link #overlay}. A press keeps the look away until the pointer
-   * has left the element and come back. {@link App#nextChange} says when the look is due, so an
+   * has left the element and come back. Once such a look has shown overlays and gone because the
+   * pointer left, the look of an element the pointer comes to within that element's {@code
+   * seconds} shows at once, as the tooltips along a toolbar do; a press ends that. {@link
+   * App#nextChange} says when the look is due, so an
    * idle window wakes for it and presents nothing while it waits. Besides what {@link
    * #whenHovered} may change, such a look may attach overlays; it comes after the hover look.
    *
@@ -2637,6 +2641,25 @@ public final class El {
   }
 
   /**
+   * Makes this element, everything inside it and the overlays attached inside it content that
+   * only shows, such as a tooltip's with links or a scroll area: presses, the wheel and the pointer
+   * go to what lies beneath them, neither Tab nor a press focuses anything in them, also not as
+   * an overlay opens, and their window-wide key and pointer handlers do not run. They still show,
+   * and a tree dump lists them; an inert overlay neither dismisses nor is modal. It is not for
+   * elements that take input of their own: a focus holder, a scroll area being dragged, or the
+   * handlers of the root and of the focus path are not kept from it.
+   *
+   * <p>shortcut: an overlay attached inside inert content becomes inert as it is placed, after
+   * layout; one that opens with a focusable element in the frame its inert anchor appears may
+   * still take the focus. Mark such overlays inert in the view, or carry inertness into the
+   * build, if one needs that.
+   */
+  public El inert() {
+    this.inert = true;
+    return this;
+  }
+
+  /**
    * Makes Tab and Shift+Tab pass this focusable element by, while a press and {@link App#focus}
    * still focus it: the paragraphs of a document, read-only fields for selecting and copying,
    * between the links that Tab reaches.
@@ -2976,6 +2999,11 @@ public final class El {
     return keepsFocus;
   }
 
+  /** Whether {@link #inert} was called. */
+  public boolean isInert() {
+    return inert;
+  }
+
   /** Whether {@link #holdFocus} was called. */
   public boolean holdsFocus() {
     return holdsFocus;
@@ -3005,8 +3033,8 @@ public final class El {
 
   /**
    * Whether this element or one inside it can take the focus, as an overlay that opens looks for
-   * it: one that {@link #isFocusable takes it} and is not at or below an element at opacity 0 or
-   * with {@code display: none}. Overlays are left out.
+   * it: one that {@link #isFocusable takes it} and is not at or below an element at opacity 0,
+   * with {@code display: none} or {@link #inert}. Overlays are left out.
    */
   public boolean hasFocusable() {
     if (hidesFocus()) {
@@ -3025,7 +3053,7 @@ public final class El {
 
   /** Whether this element keeps itself and what is inside it from the focus as it opens. */
   boolean hidesFocus() {
-    return opacity() == 0 || style().display == Style.Display.NONE;
+    return inert || opacity() == 0 || style().display == Style.Display.NONE;
   }
 
   /** The color set with {@link #focusRing(int)}, or null if none was and the app's applies. */

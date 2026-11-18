@@ -1317,11 +1317,16 @@ public final class Script {
         if (!why.isEmpty()) {
           throw fail("What matches " + text + " is " + String.join(", or ", why)
               + " in the last frame, so it takes no input."
-              + (why.equals(List.of("at opacity 0"))
-                  ? " The view gives it that opacity."
-                  : " An element with motion that appears fades in from opacity 0, and one that"
+              + (why.stream().anyMatch(w -> w.startsWith("fading"))
+                  ? " An element with motion that appears fades in from opacity 0, and one that"
                       + " leaves fades out; the clock moves only with `advance`, so run"
-                      + " `advance 1` and `frame` first."));
+                      + " `advance 1` and `frame` first."
+                  : why.stream().anyMatch(w -> w.startsWith("at opacity"))
+                      ? " The view gives it that opacity."
+                      : "")
+              + (why.contains("inert")
+                  ? " The view makes it inert (El.inert), as a tooltip is."
+                  : ""));
         }
       }
       if (matches.isEmpty()) {
@@ -1402,7 +1407,10 @@ public final class Script {
     List<El> layers = new ArrayList<>(List.of(root));
     layers.addAll(root.shownOverlays());
     int modal = layers.size() - 1;
-    while (modal > 0 && !(layers.get(modal).isModal() && !layers.get(modal).isExiting())) {
+    while (modal > 0
+        && !(layers.get(modal).isModal()
+            && !layers.get(modal).isExiting()
+            && !layers.get(modal).isInert())) {
       modal--;
     }
     float far = Float.POSITIVE_INFINITY;
@@ -1422,6 +1430,8 @@ public final class Script {
     }
     if (why == null && el.isExiting()) {
       why = "fading out";
+    } else if (why == null && el.isInert()) {
+      why = "inert";
     } else if (why == null && el.opacity() == 0) {
       why = el.targetOpacity() > 0 ? "fading in, at opacity 0" : "at opacity 0";
     }
@@ -1448,7 +1458,7 @@ public final class Script {
       float clipBottom,
       List<Found> all,
       List<Found> clipped) {
-    if (!el.isPlaced() || el.opacity() == 0 || el.isExiting()) {
+    if (!el.isPlaced() || el.opacity() == 0 || el.isExiting() || el.isInert()) {
       return;
     }
     float left = parentX + el.x();

@@ -304,15 +304,24 @@ public final class App<S> {
   // Since when the elements under the pointer with whenHoveredFor or onHoverFor have been there.
   private final Map<Object, Rest> resting = new HashMap<>();
   private double restDue = Double.POSITIVE_INFINITY; // when the next of their looks or handlers is
+  // When a whenHoveredFor look that attached overlays, such as a tooltip, last went because the
+  // pointer left its element; a stay that begins within its delay of that shows its look at once.
+  private double lookLeft = Double.NEGATIVE_INFINITY;
   private int hoversRun; // onHoverFor handlers run so far
 
   /** Where the focus was, by identity, and whether it had a ring. */
   private record Focus(Object id, boolean ring) {}
 
-  /** Since when the pointer has been over an element; whether its onHoverFor handler has run. */
+  /**
+   * Since when the pointer has been over an element; whether its onHoverFor handler has run;
+   * whether its whenHoveredFor look shows at once, as another one's has just gone; the overlays
+   * that look attached to the tree on screen.
+   */
   private static final class Rest {
     double since;
     boolean ran;
+    boolean warm;
+    List<El> attached = List.of();
 
     Rest(double since) {
       this.since = since;
@@ -659,7 +668,7 @@ public final class App<S> {
   }
 
   private static void anyKeyDown(El el, List<Consumer<Key>> handlers) {
-    if (el.isExiting()) {
+    if (el.isExiting() || el.isInert()) {
       return; // it takes no input
     }
     if (el.onAnyKeyDown() != null) {
@@ -671,7 +680,7 @@ public final class App<S> {
   }
 
   private static void anyPointerDown(El el, Set<El> hit, List<Runnable> handlers) {
-    if (el.isExiting()) {
+    if (el.isExiting() || el.isInert()) {
       return; // it takes no input
     }
     if (el.onAnyPointerDown() != null) {
@@ -719,7 +728,9 @@ public final class App<S> {
     }
     for (Rest rest : resting.values()) {
       rest.since = Double.POSITIVE_INFINITY;
+      rest.attached = List.of();
     }
+    lookLeft = Double.NEGATIVE_INFINITY;
   }
 
   /**
@@ -769,7 +780,7 @@ public final class App<S> {
     }
     boolean dismissed = false;
     for (El overlay : root.shownOverlays().reversed()) {
-      if (overlay.isExiting()) {
+      if (overlay.isExiting() || overlay.isInert()) {
         continue;
       }
       if (!hitFrom(overlay, x, y).isEmpty()
@@ -804,7 +815,7 @@ public final class App<S> {
   private El modal() {
     if (root != null) {
       for (El overlay : root.shownOverlays().reversed()) {
-        if (overlay.isModal() && !overlay.isExiting()) {
+        if (overlay.isModal() && !overlay.isExiting() && !overlay.isInert()) {
           return overlay;
         }
       }
@@ -2312,7 +2323,7 @@ public final class App<S> {
       float clipBottom,
       List<El> shown,
       List<El> found) {
-    if (!el.isPlaced() || el.targetOpacity() == 0 || el.isExiting()) {
+    if (!el.isPlaced() || el.targetOpacity() == 0 || el.isExiting() || el.isInert()) {
       return;
     }
     float left = parentX + el.x();
@@ -3921,7 +3932,19 @@ public final class App<S> {
    * is due.
    */
   private List<Object> rest(List<El> path, List<Object> ids) {
-    resting.keySet().retainAll(ids); // a stay ends when the pointer leaves
+    resting
+        .entrySet()
+        .removeIf(
+            stay -> { // a stay ends when the pointer leaves
+              boolean left = !ids.contains(stay.getKey());
+              // Only one that showed: a cut text's tooltip shows only while the text is cut.
+              if (left
+                  && root != null
+                  && !Collections.disjoint(root.shownOverlays(), stay.getValue().attached)) {
+                lookLeft = time;
+              }
+              return left;
+            });
     restDue = Double.POSITIVE_INFINITY;
     List<Object> rested = new ArrayList<>();
     for (int i = 0; i < path.size(); i++) {
@@ -3929,9 +3952,13 @@ public final class App<S> {
       if (el.restLook() == null && el.onHoverFor() == null) {
         continue;
       }
-      Rest rest = resting.computeIfAbsent(ids.get(i), id -> new Rest(time));
+      Rest rest = resting.computeIfAbsent(ids.get(i), id -> {
+        Rest stay = new Rest(time);
+        stay.warm = el.restLook() != null && time - lookLeft <= el.restDelay();
+        return stay;
+      });
       if (el.restLook() != null) {
-        double due = rest.since + el.restDelay();
+        double due = lookDue(rest, el);
         if (due <= time) {
           rested.add(ids.get(i));
         } else {
@@ -3956,23 +3983,32 @@ public final class App<S> {
   /** Applies {@code el}'s {@link El#whenHoveredFor} look if it is due; whether it did. */
   private boolean restLook(El el, Object id) {
     Rest rest = el == null || el.restLook() == null ? null : resting.get(id);
-    if (rest == null || rest.since + el.restDelay() > time) {
+    if (rest == null || lookDue(rest, el) > time) {
       return false;
     }
-    delayedLook(el, el.restLook(), "whenHoveredFor");
+    rest.attached = delayedLook(el, el.restLook(), "whenHoveredFor");
     return true;
+  }
+
+  /** When the {@link El#whenHoveredFor} look of a stay is due. */
+  private static double lookDue(Rest rest, El el) {
+    return rest.warm ? rest.since : rest.since + el.restDelay();
   }
 
   /**
    * Applies a look that waited for a stay; the overlays it attaches, such as a tooltip, avoid
    * covering their anchor, under the pointer that would leave the anchor for them and hide them.
+   *
+   * @return the overlays it attached
    */
-  private static void delayedLook(El el, Consumer<El> look, String name) {
+  private static List<El> delayedLook(El el, Consumer<El> look, String name) {
     int before = el.overlays().size();
     el.apply(look, name);
-    for (El overlay : el.overlays().subList(before, el.overlays().size())) {
+    List<El> attached = List.copyOf(el.overlays().subList(before, el.overlays().size()));
+    for (El overlay : attached) {
       overlay.placement().avoidsAnchor = true;
     }
+    return attached;
   }
 
   /**
@@ -4017,7 +4053,8 @@ public final class App<S> {
       }
       Object first = Animator.firstFocusable(overlay.getValue(), overlay.getKey());
       El el = overlay.getValue();
-      boolean takes = (el.holdsFocus() || !el.keepsFocus()) && (first != null || el.isModal());
+      boolean takes =
+          (el.holdsFocus() || !el.keepsFocus()) && (first != null || el.isModal() && !el.isInert());
       opened.put(overlay.getKey(), takes ? new Focus(focusId, ring) : null);
       if (!takes && focusId != null) {
         outside.put(overlay.getKey(), new Focus(focusId, ring));
@@ -4382,7 +4419,7 @@ public final class App<S> {
     if (root != null) {
       for (El overlay : root.shownOverlays().reversed()) {
         List<El> hit = hitFrom(overlay, x, y);
-        if (!hit.isEmpty() || overlay.isModal() && !overlay.isExiting()) {
+        if (!hit.isEmpty() || overlay.isModal() && !overlay.isExiting() && !overlay.isInert()) {
           return hit;
         }
       }
@@ -4425,10 +4462,10 @@ public final class App<S> {
 
   /**
    * Whether the point lies inside the element's rounded rectangle and the element takes input:
-   * neither invisible nor leaving.
+   * neither invisible nor leaving nor {@link El#inert}.
    */
   private static boolean contains(El el, float parentX, float parentY, float x, float y) {
-    if (!el.isPlaced() || el.opacity() == 0 || el.isExiting()) {
+    if (!el.isPlaced() || el.opacity() == 0 || el.isExiting() || el.isInert()) {
       return false;
     }
     List<Text.Box> rows = el.rangeBoxes();

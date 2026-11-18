@@ -58,6 +58,47 @@ class TooltipTest {
     assertFalse(app.tree().dump().contains("role=tooltip"), "a press keeps the tooltip away");
   }
 
+  @Test
+  void theNextAnchorShowsItsTooltipAtOnceUntilAPress() throws IOException {
+    App<int[]> app = new App<>(
+        new int[0],
+        s -> El.row()
+            .gap(40)
+            .child(Tooltip.whenShortened(El.text("C").key("c"), "C"))
+            .child(Tooltip.tooltip(El.el().key("a").size(20, 20), "A"))
+            .child(Tooltip.tooltip(El.el().key("b").size(20, 20), "B"))
+            .child(Tooltip.whenShortened(El.text("D is cut").ellipsis().w(20).key("d"), "D")));
+    Script.run("size 240 100\nframe\nmove #c\nframe\nadvance 0.5\nframe\nmove #a\nframe", app, out);
+    assertFalse(app.tree().dump().contains("role=tooltip"), "C's text fits: nothing showed");
+    Script.run("advance 0.5\nframe", app, out);
+    assertTrue(app.tree().dump().contains("role=tooltip label=\"A\""));
+    Script.run("move #b\nframe", app, out);
+    assertTrue(app.tree().dump().contains("role=tooltip label=\"B\""), "at once after A's");
+    Script.run("press #b\nframe\nmove #a\nframe", app, out);
+    assertFalse(app.tree().dump().contains("role=tooltip label=\"A\""), "a press ends that");
+    Script.run("move #d\nframe\nadvance 0.5\nframe", app, out);
+    assertTrue(app.tree().dump().contains("role=tooltip label=\"D\""));
+    Script.run("move #a\nframe", app, out);
+    assertTrue(app.tree().dump().contains("role=tooltip label=\"A\""), "at once after D's");
+  }
+
+  @Test
+  void tabPassesTheFocusableContentOfATooltipBy() throws IOException {
+    App<int[]> app = new App<>(
+        new int[0],
+        s -> El.col()
+            .gap(2)
+            .child(Tooltip.tooltip(
+                El.el().key("anchor").size(20, 20).focusable(),
+                () -> El.el().key("link").size(60, 20).focusable()))
+            .child(El.el().key("below").size(40, 40).focusable()));
+    Script.run("size 200 100\nframe\nfocus #anchor\nframe\nadvance 0.75\nframe", app, out);
+    assertTrue(app.tree().dump().contains("#link"), "the tooltip shows");
+    Script.run("key Tab\nframe", app, out);
+    String dump = app.tree().dump();
+    assertTrue(dump.lines().anyMatch(l -> l.contains("#below") && l.endsWith(" focused")), dump);
+  }
+
   @ParameterizedTest(name = "{0} at {1}x")
   @CsvSource({"dark, 2", "light, 2"})
   void showsBelowItsAnchorAfterTheDelay(String theme, int scale) throws IOException {
@@ -67,7 +108,7 @@ class TooltipTest {
     assertTrue(waiting.contains("label=\"?\""), waiting);
     String shown = Bench.tree(out, "tooltip", theme, scale, "shown");
     assertTrue(
-        shown.contains("\noverlay bottom center gap 2 on #help role=button label=\"?\""), shown);
+        shown.contains("\noverlay bottom center gap 4 on #help role=button label=\"?\""), shown);
     assertTrue(shown.contains(" role=tooltip label=\"Keyboard shortcuts\" "), shown);
   }
 
@@ -78,7 +119,7 @@ class TooltipTest {
     App<Bench> app = Bench.assertScript("keytip", theme, scale, out);
     String shown = Bench.tree(out, "keytip", theme, scale, "shown");
     assertTrue(
-        shown.contains("\noverlay bottom center gap 2 on #help role=button label=\"?\""), shown);
+        shown.contains("\noverlay bottom center gap 4 on #help role=button label=\"?\""), shown);
     assertTrue(shown.contains(" label=\"?\" ") && shown.contains(" focused\n"), shown);
     String size = "size 360 240 scale " + scale + "\n";
     Script.run(size + "key A\nframe\nadvance 0.25\nframe\n", app, out); // it fades out
