@@ -53,7 +53,7 @@ A value with a line break, or Alt+Enter in a text column, opens a modal field of
 
 For rows of records or POJOs, `options().onCommit(table, (row, value) -> error)` hands the app the row with the typed value, see [Rows of records](/docs/components/data-grid/typed).
 
-The options that `changes` wires are there on their own, for an app that keeps changes in its own way:
+An app that keeps changes in its own way sets these options itself:
 
 | Option | |
 | --- | --- |
@@ -61,6 +61,7 @@ The options that `changes` wires are there on their own, for an app that keeps c
 | `onPaste(cells)` | Takes a list of `CellValue(row, column, value)` in one change |
 | `onInsertRow(after)`, `onDeleteRows(ranges)`, `appendRow()` | New rows and deleted ones. `appendRow` shows an empty row marked `*` after the last; a value typed into it adds a row at the end |
 | `status(rows, cells)` | What to mark: `Status.CHANGED`, `NEW`, `DELETED`, `ERROR` |
+| `errors((row, column) -> message)` | The message in the tooltip of a cell marked `ERROR`, null for none |
 | `history(undo, redo)` | Control+Z and Control+Y |
 | `onEdit((row, column) -> …)` | The app edits the cell itself, in a field it lays over it |
 
