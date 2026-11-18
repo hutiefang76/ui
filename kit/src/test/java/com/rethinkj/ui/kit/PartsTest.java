@@ -173,7 +173,7 @@ class PartsTest {
   }
 
   @Test
-  void theBreadcrumbGoesUpAndShortensAtItsStart() throws IOException {
+  void theBreadcrumbGoesUpOpensWhatIsInsideAndShortens() throws IOException {
     App<Parts> app = run(720, "");
     String dump = app.tree().dump();
     assertTrue(dump.contains("role=navigation label=\"Breadcrumb\""), dump);
@@ -182,6 +182,12 @@ class PartsTest {
             && StructureTest.line(dump, "label=\"orders_by_customer_and_month\"")
                 .contains(" current"),
         dump);
+    more(app, out, 720, "press role=button label=\"Inside public\"\nframe\nadvance 0.25\nframe");
+    assertTrue(
+        StructureTest.line(app.tree().dump(), "label=\"Inside public\"").contains(" expanded"),
+        app.tree().dump());
+    more(app, out, 720, "press role=menuitem label=\"customers\"\nframe");
+    assertEquals("table customers", app.state().log.getLast());
     more(app, out, 720, "focus role=link label=\"localhost\"\nframe");
     more(app, out, 720, "key Tab shift\nkey Tab\nframe");
     assertEquals("localhost", app.focused().label(), "one stop, at the first part");
@@ -209,32 +215,47 @@ class PartsTest {
   }
 
   @Test
-  void aBreadcrumbKeepsTheSuffixThatFitsBesideMore() throws IOException {
+  void aBreadcrumbFitsItsTextAsShapedAtTheWindowsScale() throws IOException {
+    List<Breadcrumb.Crumb> crumbs = List.of(
+        Breadcrumb.crumb("Projects", () -> {}),
+        Breadcrumb.crumb("shared-internationalization-and-localization-settings", null));
+    App<Breadcrumb.State> app = new App<>(
+        new Breadcrumb.State(), s -> col().w(410).child(Breadcrumb.breadcrumb(s, crumbs)));
+    Script.run("size 450 40 scale 1.25\nframe\nframe\nframe", app, out);
+    String dump = app.tree().dump();
+    assertTrue(
+        dump.contains("label=\"Hidden parts\""),
+        "shaped at 1.25 the path is wider than at 1, so Projects gives way: " + dump);
+  }
+
+  @Test
+  void aBreadcrumbHidesItsMiddleBeforeItsStart() throws IOException {
     Theme t = Theme.DARK;
-    Breadcrumb.State state = new Breadcrumb.State();
+    List<Breadcrumb.Crumb> crumbs = List.of(
+        Breadcrumb.crumb("first", () -> {}),
+        Breadcrumb.crumb("middle", () -> {}),
+        Breadcrumb.crumb("current", null));
     float[] width = {400};
     App<Breadcrumb.State> app = new App<>(
-        state,
-        s -> col()
-            .w(width[0])
-            .child(Breadcrumb.breadcrumb(s, List.of("first", "middle", "current"), i -> {})));
+        new Breadcrumb.State(), s -> col().w(width[0]).child(Breadcrumb.breadcrumb(s, crumbs)));
     Script.run("size 400 100\nframe\nframe", app, out);
-    width[0] = 1;
-    app.invalidate();
-    Script.run("frame\nframe\nframe", app, out);
-    width[0] = (float) Math.ceil(state.fitting.width("more")
-        + state.fitting.width("1:middle")
-        + state.fitting.width("2:current")
-        + 2 * t.space().xs());
+    Breadcrumb.State state = app.state();
+    width[0] = (float)
+        Math.ceil(Breadcrumb.width(t, crumbs.get(0), false, state.text(t, crumbs.get(0), false))
+            + Breadcrumb.moreWidth(t)
+            + Breadcrumb.width(t, crumbs.get(2), true, state.text(t, crumbs.get(2), true))
+            + 2 * t.space().xs());
     app.invalidate();
     Script.run("frame\nframe", app, out);
     String dump = app.tree().dump();
-    assertTrue(dump.contains("label=\"middle\""), dump);
-    assertFalse(dump.contains("label=\"first\""), dump);
+    assertTrue(dump.contains("label=\"first\""), dump);
+    assertFalse(dump.contains("label=\"middle\""), dump);
     width[0] -= t.space().xs();
     app.invalidate();
     Script.run("frame\nframe", app, out);
-    assertFalse(app.tree().dump().contains("label=\"middle\""), app.tree().dump());
+    dump = app.tree().dump();
+    assertFalse(dump.contains("label=\"first\""), dump);
+    assertTrue(dump.contains("label=\"current\""), dump);
   }
 
   @Test

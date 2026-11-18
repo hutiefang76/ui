@@ -1,19 +1,20 @@
-el 0,0 240x280
-  el role=navigation label="Breadcrumb" 12,12 216x24
-    el #more role=button label="Hidden parts" 12,12 19x24
-      text "…" 16,16 11x16
-    el #crumb-1 33,12 53x24
-      text label="chevron_right" "\u{F2AE}" 33,18 12x12
-      el role=link label="shop" 47,12 39x24
-        text "shop" 51,16 31x16
-    el #crumb-2 88,12 59x24
-      text label="chevron_right" "\u{F2AE}" 88,18 12x12
-      el role=link label="public" 102,12 45x24
-        text "public" 106,16 37x16
-    el #crumb-3 149,12 63x24
-      text label="chevron_right" "\u{F2AE}" 149,18 12x12
-      el role=link label="orders" 163,12 49x24 current
-        text "orders" 167,16 41x16
+el 0,0 260x280
+  el role=navigation label="Breadcrumb" 12,12 236x24
+    el #crumb-0 12,12 102x24
+      el role=link label="localhost" 12,12 84x24
+        text label="server" "\u{F1DC}" 16,16 16x16
+        text "localhost" 36,16 56x16
+      el 98,12 16x24
+        text label="chevron_right" "\u{F2AE}" 100,18 12x12
+    el #more 116,12 42x24
+      el role=button label="Hidden parts" 116,12 24x24 expanded
+        text label="more_horizontal" "\u{E823}" 120,16 16x16
+      el 142,12 16x24
+        text label="chevron_right" "\u{F2AE}" 144,18 12x12
+    el #crumb-3 160,12 69x24
+      el role=link label="orders" 160,12 69x24 current
+        text label="table" "\u{EBF4}" 164,16 16x16
+        text "orders" 184,16 41x16
   el role=list 8,44 320x72
     el role=listitem label="Name" 8,44 320x24 value="orders"
       el 12,44 37x24
@@ -33,9 +34,15 @@ el 0,0 240x280
       text role=textbox "16384" 57,92 235x24 readonly
       el #copy role=button label="Copy OID" 300,92 24x24
         text label="copy" "\u{F32A}" 304,96 16x16
-overlay bottom start gap 2 on #more role=button label="Hidden parts" 12,12 19x24
-  el #menu role=menu 12,38 106x34 focused
-    el #item-0 role=menuitem label="localhost" 17,43 96x24
-      el 17,43 96x24
-        el 25,55 16x0
-        text "localhost" 49,47 56x16
+overlay bottom start gap 2 on role=button label="Hidden parts" 116,12 24x24
+  el #menu role=menu 116,38 87x58 focused
+    el #item-0 role=menuitem label="shop" 121,43 77x24
+      el 121,43 77x24
+        el 129,47 16x16
+          text label="database" "\u{F0D7}" 129,47 16x16
+        text "shop" 153,47 37x16
+    el #item-1 role=menuitem label="public" 121,67 77x24
+      el 121,67 77x24
+        el 129,71 16x16
+          text label="folder" "\u{E643}" 129,71 16x16
+        text "public" 153,71 37x16
