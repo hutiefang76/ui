@@ -4,15 +4,20 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import com.rethinkj.ui.App;
+import com.rethinkj.ui.El;
+import com.rethinkj.ui.FieldState;
+import com.rethinkj.ui.Highlighter;
 import com.rethinkj.ui.Spans;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 /**
- * The tokens of {@link Sql}, line by line with the state the lines before left, and the bracket
- * matching of {@link CodeEditor}; without the native libraries.
+ * The tokens of {@link Sql}, line by line with the state the lines before left, without the native
+ * libraries, and the brackets it marks, as a field that laid it out pairs them.
  */
 class SqlTest {
 
@@ -123,14 +128,37 @@ class SqlTest {
     assertNull(SQL.line("end */", state, new Spans(6)));
   }
 
+  /** The pair at the caret in a field that has laid out and highlighted the text. */
+  private static int[] matching(Highlighter highlighter, String text, int caret) {
+    FieldState state = new FieldState();
+    Supplier<El> field = () -> {
+      El f = El.text(text).editable(value -> {}).multiline().fieldState(state);
+      return highlighter == null ? f : f.highlight(highlighter, highlighter);
+    };
+    App<Object> app = new App<>(new Object(), model -> field.get());
+    app.resize(400, 200, 1);
+    app.frame();
+    return field.get().matchingBracket(caret);
+  }
+
   @Test
-  void bracketsMatchAcrossNesting() {
+  void bracketsMatchAcrossNestingOutsideStringsAndComments() {
+    TextLibraries.assumeLoaded();
     String text = "f(a, (b), [c])";
-    assertArrayEquals(new int[] {1, 13}, CodeEditor.matching(text, 2), "after the caret's left");
-    assertArrayEquals(new int[] {13, 1}, CodeEditor.matching(text, 14), "before the caret");
-    assertArrayEquals(new int[] {5, 7}, CodeEditor.matching(text, 5), "the one after the caret");
-    assertArrayEquals(new int[0], CodeEditor.matching(text, 3));
-    assertArrayEquals(new int[] {0}, CodeEditor.matching("(a", 0), "no partner");
+    assertArrayEquals(new int[] {1, 13}, matching(SQL, text, 2), "after the caret's left");
+    assertArrayEquals(new int[] {13, 1}, matching(SQL, text, 14), "before the caret");
+    assertArrayEquals(new int[] {5, 7}, matching(SQL, text, 5), "the one after the caret");
+    assertArrayEquals(new int[0], matching(SQL, text, 3));
+    assertArrayEquals(new int[] {0}, matching(SQL, "(a", 0), "no partner");
+    String quoted = "SELECT f(')')";
+    assertArrayEquals(new int[] {8, 12}, matching(SQL, quoted, 9), "not the one in the string");
+    assertArrayEquals(new int[0], matching(SQL, quoted, 11), "the one in the string pairs none");
+    assertArrayEquals(new int[] {10, 8}, matching(null, quoted, 11), "without a highlighter: all");
+    String commented = "f(a -- )\n/* ( */ )";
+    assertArrayEquals(new int[] {1, 17}, matching(SQL, commented, 2), "across comments");
+    Sql mysql = new Sql(C, Sql.Dialect.MYSQL);
+    assertArrayEquals(
+        new int[] {1, 10}, matching(mysql, "f(`)` # )\n)", 2), "MySQL's identifiers, comments");
   }
 
   @Test

@@ -36,6 +36,9 @@ public final class Spans {
   int[] colors = new int[4];
   Font[] fonts = new Font[4];
   int[] lineBackgrounds = new int[0]; // from the bottom up
+  int[] brackets = new int[0]; // the positions of brackets of the code, sorted once read
+  int bracketCount;
+  private boolean bracketsSorted = true;
   private boolean styled; // a color or a font, which the glyphs need
 
   // For Lines: the state the line was highlighted from and the one it ended in.
@@ -143,6 +146,32 @@ public final class Spans {
       lineBackgrounds[lineBackgrounds.length - 1] = argb;
     }
     return this;
+  }
+
+  /**
+   * Character {@code at} is a bracket of the code, one of {@code ( ) [ ] { }}, which bracket
+   * matching pairs ({@link El#matchingBracket}); a highlighter that {@link
+   * Highlighter#marksBrackets marks brackets} gives those outside strings and comments, and a
+   * bracket it does not give pairs with none. Draws nothing; a decorator's are ignored.
+   */
+  public Spans bracket(int at) {
+    if (!discard && at >= 0 && at < length) {
+      if (bracketCount == brackets.length) {
+        brackets = Arrays.copyOf(brackets, Math.max(4, bracketCount * 2));
+      }
+      bracketsSorted &= bracketCount == 0 || brackets[bracketCount - 1] < at;
+      brackets[bracketCount++] = at;
+    }
+    return this;
+  }
+
+  /** The brackets of the code, ascending, in {@code brackets[0]} to {@code bracketCount - 1}. */
+  int[] brackets() {
+    if (!bracketsSorted) {
+      Arrays.sort(brackets, 0, bracketCount);
+      bracketsSorted = true;
+    }
+    return brackets;
   }
 
   private Spans add(int kind, int from, int to, int argb, Font font) {
