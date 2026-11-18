@@ -54,6 +54,7 @@ final class Layouts {
       new Tabs.Tab("customers", true, true).icon(Symbol.TABLE),
       new Tabs.Tab("query 1", true, false).icon(Symbol.CODE)));
   int tab;
+  int result;
   final Breadcrumb.State crumbs = new Breadcrumb.State();
   final Toolbar.State tools = new Toolbar.State();
   final Menu.State runMenu = new Menu.State();
@@ -148,6 +149,10 @@ final class Layouts {
 
   void tab(int index) {
     tab = index;
+  }
+
+  void result(int index) {
+    result = index;
   }
 
   void wrapped(boolean on) {
@@ -367,6 +372,23 @@ final class Layouts {
     El tabs = Tabs.tabs(state.tabs, state.tab, state::tab, index -> close(state, index), content);
     // docs:end tabs
     return Frame.of(tabs.wFull().grow(1));
+  }
+
+  static El tabsLine(Layouts state) {
+    Theme theme = Theme.CURRENT.get();
+    // docs:start tabs-line
+    El results = Tabs.tabs(
+        List.of(new Tabs.Tab("Result", false, false), new Tabs.Tab("Messages", false, false)),
+        state.result,
+        state::result,
+        null,
+        col()
+            .padding(theme.space().l())
+            .child(Label.label(state.result == 0 ? "6 rows in 18 ms" : "No messages")),
+        Tabs.options().variant(Tabs.Variant.LINE));
+    El card = Card.flush(Card.toolbar("orders by month", null), results.grow(1));
+    // docs:end tabs-line
+    return Frame.of(card.wFull().grow(1));
   }
 
   // docs:start tabs-close
