@@ -37,7 +37,7 @@ final class MarkdownParser {
     String text = source == null ? "" : source;
     try {
       return read(text);
-    } catch (RuntimeException | StackOverflowError e) {
+    } catch (RuntimeException | StackOverflowError _) {
       // shortcut: a fault of the reader shows the text as it is rather than failing the view;
       // the tests make sure it never comes to this.
       return new MarkdownDocument(List.of(new MarkdownDocument.CodeBlock("", text)));
@@ -165,7 +165,6 @@ final class MarkdownParser {
     partiallyConsumedTab = false;
     B container = doc;
     oldTip = tip;
-    boolean allMatched = true;
     B last;
     while ((last = container.last()) != null && last.open) {
       container = last;
@@ -175,7 +174,6 @@ final class MarkdownParser {
         return;
       }
       if (result == 1) {
-        allMatched = false;
         container = container.parent;
         break;
       }
@@ -374,9 +372,7 @@ final class MarkdownParser {
         closeUnmatched();
         B heading = add(HEADING);
         heading.level = m.group().strip().length();
-        String content = line.substring(offset);
-        content = content.replaceAll("^[ \\t]*#+[ \\t]*$", "").replaceAll("[ \\t]+#+[ \\t]*$", "");
-        heading.content.append(content.strip());
+        heading.content.append(withoutClosingSequence(line.substring(offset)).strip());
         advanceOffset(line.length() - offset, false);
         return 2;
       }
@@ -778,6 +774,24 @@ final class MarkdownParser {
 
   private static boolean isSpaceOrTab(char c) {
     return c == ' ' || c == '\t';
+  }
+
+  /**
+   * A heading's text without its closing run of #, which ends it, blanks aside, and follows a
+   * blank or begins it. Cut by hand: a regex retried at every blank of a long run.
+   */
+  private static String withoutClosingSequence(String content) {
+    int end = content.length();
+    while (end > 0 && isSpaceOrTab(content.charAt(end - 1))) {
+      end--;
+    }
+    int start = end;
+    while (start > 0 && content.charAt(start - 1) == '#') {
+      start--;
+    }
+    return start < end && (start == 0 || isSpaceOrTab(content.charAt(start - 1)))
+        ? content.substring(0, start)
+        : content;
   }
 
   private void findNextNonspace() {
@@ -1977,7 +1991,7 @@ final class MarkdownParser {
           item.blocks().forEach(b -> tree(b, depth + 2, out));
         }
       }
-      case MarkdownDocument.ThematicBreak t -> line(out, depth, "hr");
+      case MarkdownDocument.ThematicBreak _ -> line(out, depth, "hr");
       case MarkdownDocument.Table t -> {
         line(
             out,
@@ -2035,8 +2049,8 @@ final class MarkdownParser {
               depth,
               "image " + quote(m.source()) + (m.title().isEmpty() ? "" : " " + quote(m.title()))
                   + " alt=" + quote(m.alt()));
-        case MarkdownDocument.SoftBreak s -> line(out, depth, "softbreak");
-        case MarkdownDocument.HardBreak h -> line(out, depth, "hardbreak");
+        case MarkdownDocument.SoftBreak _ -> line(out, depth, "softbreak");
+        case MarkdownDocument.HardBreak _ -> line(out, depth, "hardbreak");
       }
     }
   }
