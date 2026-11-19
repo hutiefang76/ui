@@ -1,0 +1,1 @@
+- `WindowIcon.ico()` returns the icon as a Windows `.ico` file with PNGs from 16 to 256 pixels, for `jpackage --icon` and installers.
