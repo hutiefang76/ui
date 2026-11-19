@@ -82,6 +82,10 @@ public final class Menu {
 
   private static final boolean WINDOWS = System.getProperty("os.name", "").startsWith("Windows");
 
+  // The text of an item whose keys are written where the menu shows, in its texts; by identity,
+  // so that no text an app gives, and no null, which hides the text, is taken for it.
+  private static final String KEYS = new String();
+
   private Menu() {}
 
   /**
@@ -154,6 +158,16 @@ public final class Menu {
           label, shortcut, keys, checked, icon, onChoose, submenu, leading, dangerous, moreKeys);
     }
 
+    /**
+     * The text shown at the item's right: its own, or else its key combination as {@link
+     * #shortcutText} writes it where this is called, so that an item kept in the app's state
+     * names its keys in the texts of the menu it shows in.
+     */
+    @Override
+    public String shortcut() {
+      return shortcut == KEYS ? shortcutText(keys) : shortcut;
+    }
+
     /** This item with a text shown at its right, which only shows: no key runs the item. */
     public Item shortcut(String text) {
       return new Item(
@@ -172,16 +186,8 @@ public final class Menu {
     public Item shortcut(int modifiers, String key) {
       Key k = combination(modifiers, key);
       return new Item(
-          label,
-          shortcutText(k),
-          k,
-          checked,
-          icon,
-          onChoose,
-          submenu,
-          leading,
-          dangerous,
-          moreKeys);
+          label, KEYS, // written where the menu shows, in its texts: see shortcut()
+          k, checked, icon, onChoose, submenu, leading, dangerous, moreKeys);
     }
 
     /**
@@ -266,7 +272,8 @@ public final class Menu {
    * Linux), then the key: {@code Ctrl+Shift+N}, {@code Alt+F4}, {@code F5}. Arrows are {@code Up},
    * {@code Down}, {@code Left} and {@code Right}, Escape is {@code Esc}; Windows writes {@code
    * Del}, {@code Ins}, {@code PgUp} and {@code PgDn} where Linux writes {@code Delete}, {@code
-   * Insert}, {@code Page Up} and {@code Page Down}.
+   * Insert}, {@code Page Up} and {@code Page Down}. Each name is then the one of the {@link Texts}
+   * where this is called ({@link Texts#key}), such as {@code Strg+Umschalt+N} in German.
    */
   public static String shortcutText(Key key) {
     return shortcutText(key, WINDOWS);
@@ -315,6 +322,7 @@ public final class Menu {
           case "NumpadDecimal" -> "Num .";
           default -> name.startsWith("Numpad") ? "Num " + name.substring(6) : name;
         });
+    keys.replaceAll(Texts.CURRENT.get()::key);
     return keys;
   }
 

@@ -108,18 +108,22 @@ public final class ValueField {
         this.value = value;
         text = format.text(value);
         error = format.parse(text).error();
+      } else if (error != null) {
+        // The message in the view's texts, also after they changed; only its words change.
+        String again = format.parse(text).error();
+        error = again != null ? again : error;
       }
     }
 
     /**
      * An edit of the text: refused when typing cannot lead to a value, else kept, and its value
-     * handed on when it is one.
+     * handed on when it is one. Its message is in {@code texts}, those of the view the field is in.
      */
-    <T> void edit(Format<T> format, String text, Consumer<? super T> onChange) {
+    <T> void edit(Texts texts, Format<T> format, String text, Consumer<? super T> onChange) {
       if (!format.allows(text)) {
         return; // refused: the field shows the draft as it was
       }
-      Format.Parsed<T> parsed = format.parse(text);
+      Format.Parsed<T> parsed = Texts.CURRENT.with(texts, () -> format.parse(text));
       showsError = true;
       this.text = text;
       error = parsed.error();
@@ -174,7 +178,9 @@ public final class ValueField {
       Format<T> format, T value, String placeholder, Draft draft, Consumer<? super T> onChange) {
     Objects.requireNonNull(format, "format");
     draft.show(format, value);
-    Consumer<String> edit = onChange == null ? null : text -> draft.edit(format, text, onChange);
+    Texts texts = Texts.CURRENT.get();
+    Consumer<String> edit =
+        onChange == null ? null : text -> draft.edit(texts, format, text, onChange);
     El field = TextField.textField(draft.text, placeholder, edit);
     if (draft.error != null && draft.showsError) {
       TextField.invalid(field).errorMessage(draft.error);
