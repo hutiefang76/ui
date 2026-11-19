@@ -78,7 +78,8 @@ class ProgressTest {
                     () -> st.pressed++,
                     Button.options()
                         .icon(Symbol.PLAY)
-                        .state(st.busy ? Button.State.BUSY : Button.State.READY))
+                        .state(st.busy ? Button.State.BUSY : Button.State.READY)
+                        .progress(st.fraction))
                 .key("run")));
     run(app, "key Tab\nframe\nkey Enter\nframe\npress role=button busy");
     assertEquals(0, s.pressed);
@@ -87,12 +88,46 @@ class ProgressTest {
     assertTrue(StructureTest.line(dump, "#run").contains(" busy"), dump);
     assertTrue(dump.contains("role=progressbar label=\"Loading\""), dump);
 
+    // With a progress, a ring stands in place of the spinner.
+    s.fraction = 0.75;
+    app.invalidate();
+    run(app, "");
+    dump = app.tree().dump();
+    assertFalse(dump.contains("label=\"Loading\""), dump);
+    assertTrue(
+        dump.lines().anyMatch(l -> l.contains("role=progressbar ") && l.endsWith(" value=\"75%\"")),
+        dump);
+
     s.busy = false;
     app.invalidate();
     run(app, "press role=button label=\"Run\"");
     assertEquals(1, s.pressed);
     assertFalse(StructureTest.line(app.tree().dump(), "#run").contains(" busy"));
     assertFalse(app.isMoving(), "no spinner, nothing goes round");
+  }
+
+  @Test
+  void theIconOfADoneDownloadShowsWithoutTheRingOverIt() throws IOException {
+    TextLibraries.assumeLoaded();
+    Shown s = new Shown();
+    s.fraction = 0.6;
+    App<Shown> app = new App<>(
+        s,
+        st -> col()
+            .child(Button.icon(
+                Button.Variant.GHOST,
+                Symbol.ARROW_DOWNLOAD,
+                "Download update",
+                () -> {},
+                Button.options()
+                    .state(st.busy ? Button.State.BUSY : Button.State.READY)
+                    .progress(st.fraction))));
+    run(app, "advance 1");
+    s.busy = false;
+    app.invalidate();
+    app.frame();
+    String dump = app.tree().dump();
+    assertFalse(dump.contains("exiting"), dump);
   }
 
   @Test
