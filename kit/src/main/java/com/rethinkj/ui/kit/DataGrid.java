@@ -1079,6 +1079,17 @@ public final class DataGrid {
   public static final class Selection {
     final ScrollState rowsScroll = new ScrollState(); // the rows, up and down
     final ScrollState gridScroll = new ScrollState(); // header and rows, sideways
+    int scrollRow = -1; // the row that scrollToRow puts at the top at the next build, -1 for none
+    // The cursor's row when scrollToRow scrolled away from it: until the cursor moves on, the
+    // rows keep no row in view, so that the next row it moves to shows.
+    int heldRow = -1;
+    boolean holding;
+    int revealed = -1; // the row the last build told the rows to keep in view, -1 for none
+    boolean revealing; // the last build told them another one, which layout scrolls to
+    // The rows of the last grid built with it and of the one before, which tell what is in view
+    // until the last is laid out.
+    El rows;
+    El rowsBefore;
     private final Mode mode;
     private int row = -1;
     private int column = -1;
@@ -1276,8 +1287,78 @@ public final class DataGrid {
      */
     public void reset() {
       clear();
+      scrollRow = -1;
       rowsScroll.scrollTo(0, 0);
       gridScroll.scrollTo(0, 0);
+    }
+
+    /**
+     * Scrolls the rows at the next build so that this row is at their top, or as far as the end
+     * of the rows allows, as buttons that page through a long result do; the selection and the
+     * scrolling sideways stay as they are. It wins over the cursor's row, also where the cursor
+     * moved in the same handler, whose column still shows sideways as always. Later builds do not
+     * scroll back to the cursor; once it moves to another row, the grid shows that row.
+     *
+     * @param row the row, from 0; one beyond the last scrolls to the end
+     * @throws IllegalArgumentException if {@code row} is negative
+     */
+    public void scrollToRow(int row) {
+      if (row < 0) {
+        throw new IllegalArgumentException("row must be 0 or more, was " + row);
+      }
+      scrollRow = row;
+    }
+
+    /**
+     * The first row wholly in view in the grid built with it, as the last frame showed it, or as
+     * the view's build scrolled it, for a status line built after the grid: with {@link
+     * #lastRowInView} what it shows as "Rows 201–223", and where a button that goes a page back or
+     * on scrolls ({@link #scrollToRow}). A row partly under the bar along the bottom is not whole.
+     * Reading it builds nothing: a view shows the rows in view as of its build.
+     *
+     * @return the row, from 0; -1 before the grid was laid out, without rows, or where no row
+     *     fits whole
+     */
+    public int firstRowInView() {
+      return inView()[0];
+    }
+
+    /**
+     * The last row wholly in view in the grid built with it, as {@link #firstRowInView} tells; see
+     * {@link #firstRowInView}. The row a grid appends ({@link Options#appendRow}) counts as
+     * one beyond the app's last.
+     *
+     * @return the row, from 0; -1 before the grid was laid out, without rows, or where no row
+     *     fits whole
+     */
+    public int lastRowInView() {
+      return inView()[1];
+    }
+
+    /**
+     * The first and the last row wholly in view, or -1 and -1 for none: at the offset the rows
+     * have, or that the build of the view gave them before layout, as high and covered by a bar
+     * along their bottom as the rows of the last frame.
+     */
+    private int[] inView() {
+      int[] none = {-1, -1};
+      El placed = rows != null && rows.isPlaced() ? rows : rowsBefore;
+      if (rows == null || placed == null || !placed.isPlaced() || rows.rowCount() == 0) {
+        return none;
+      }
+      double high = rows.rowHeight();
+      double view = placed.height() - placed.coverY();
+      double limit = Math.max(0, rows.rowCount() * high + placed.coverY() - placed.height());
+      double top = rows == placed ? rows.scrollY() : Math.clamp(rowsScroll.y(), 0, limit);
+      if (rows != placed && revealing && revealed < rows.rowCount()) {
+        double above = revealed * high - top; // as layout will show the row, nearest first
+        double below = above + high - view;
+        top = Math.clamp(
+            top + (above < 0 ? above : below > 0 ? Math.min(below, above) : 0), 0, limit);
+      }
+      long first = (long) Math.ceil(top / high);
+      long last = Math.min((long) Math.floor((top + view) / high) - 1, rows.rowCount() - 1L);
+      return last < first ? none : new int[] {(int) first, (int) last};
     }
 
     /** Selects this cell alone, or its row in {@link Mode#ROWS}, with cursor and anchor on it. */
@@ -2275,10 +2356,22 @@ public final class DataGrid {
         .scrollbars(theme.scrollbars());
     b.body = body;
     if (sel != null) {
+      if (sel.scrollRow >= 0) {
+        sel.rowsScroll.scrollTo(sel.rowsScroll.x(), sel.scrollRow * (double) g.rowHeight());
+        sel.scrollRow = -1;
+        sel.holding = true; // a cursor moved before it in the same handler does not scroll back
+        sel.heldRow = sel.row();
+      }
       body.scrollState(sel.rowsScroll);
+      sel.rowsBefore = sel.rows;
+      sel.rows = body;
     }
-    if (sel != null && sel.row() >= 0) {
-      body.revealRow(sel.row());
+    if (sel != null) {
+      sel.holding &= sel.row() == sel.heldRow;
+      int reveal = sel.holding ? -1 : sel.row();
+      sel.revealing = reveal >= 0 && reveal != sel.revealed;
+      sel.revealed = reveal;
+      body.revealRow(reveal);
     }
     if (options.onRows != null) {
       body.onRowsBuilt(options.onRows);
