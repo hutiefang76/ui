@@ -2299,7 +2299,8 @@ public final class El {
    * one wins.
    *
    * <p>Only elements with a look cause a rebuild when the pointer reaches or leaves them: moving
-   * the pointer over plain elements rebuilds nothing.
+   * the pointer over plain elements rebuilds nothing. In the rows of a virtual list ({@link #rows})
+   * the look moves from row to row as the list builds rows anew, without a rebuild of the view.
    *
    * @param look changes the element, or null for none
    */
@@ -3775,6 +3776,23 @@ public final class El {
       float clipRight,
       float windowWidth,
       float windowHeight) {
+    return wantedRows(left, top, clipLeft, clipRight, windowWidth, windowHeight, false);
+  }
+
+  /**
+   * Like {@link #wantedRows(float, float, float, float, float, float)}.
+   *
+   * @param anew whether to want the rows that a list built anew would, also when it has them;
+   *     then null where those are built for another part sideways than the rows it has
+   */
+  int[] wantedRows(
+      float left,
+      float top,
+      float clipLeft,
+      float clipRight,
+      float windowWidth,
+      float windowHeight,
+      boolean anew) {
     if (rowBuilder == null) {
       return null;
     }
@@ -3790,15 +3808,18 @@ public final class El {
       shown = Math.max(Math.max(Math.max(left, clipLeft), 0) - origin, 0);
       shownTo = Math.max(Math.min(Math.min(left + width, clipRight), windowWidth) - origin, shown);
     }
-    if (rowsBuilt
-        && first >= firstRow
+    float margin = (shownTo - shown) / 2;
+    float start = Math.max(shown - margin, 0);
+    boolean has = first >= firstRow
         && end <= firstRow + children.size()
-        && (!spans || shown >= spanFrom && shownTo <= spanTo)) {
+        && (!spans || shown >= spanFrom && shownTo <= spanTo);
+    // Anew, none for another part sideways: only a rebuild of the view builds those cells.
+    boolean sideways = spans && (start != spanFrom || shownTo + margin != spanTo);
+    if (rowsBuilt && (anew ? sideways : has)) {
       return null;
     }
     if (spans) {
-      float margin = (shownTo - shown) / 2;
-      spanFrom = Math.max(shown - margin, 0);
+      spanFrom = start;
       spanTo = shownTo + margin;
     }
     return new int[] {Math.max(first - OVERSCAN, 0), (int) Math.min(end + (long) OVERSCAN, rowCount)
