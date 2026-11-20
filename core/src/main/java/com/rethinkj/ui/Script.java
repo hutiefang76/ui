@@ -56,7 +56,8 @@ import java.util.regex.Pattern;
  * </pre>
  *
  * <p>{@code snap} also writes {@code <name>.clipboard.txt} with the text on the app's clipboard,
- * when there is any. A {@code press} and a {@code wheel} act at their target's position without
+ * when there is any, and {@code <name>.opened.txt} with the addresses the app opened so far
+ * ({@link App#openUri}), one per line, when there are any; a script opens no browser. A {@code press} and a {@code wheel} act at their target's position without
  * moving the pointer: what looks hovered stays where {@code move} left it.
  *
  * <p>Only {@code frame} runs a frame. As in a window, input and {@code advance} between frames
@@ -502,7 +503,8 @@ public final class Script {
                     + " rebuilds the view and moves what is animated.");
           }
           // Each open window, the first under the name and the others under theirs before it.
-          for (Win each : desk.open()) {
+          List<Win> open = desk.open();
+          for (Win each : open) {
             String name = (each == desk.first ? "" : slug(each.title) + "-") + args.getFirst();
             Path png;
             Path tree;
@@ -537,6 +539,12 @@ public final class Script {
               Path copied = folder.resolve(name + ".clipboard.txt").normalize();
               Files.writeString(copied, clipboard);
               written.add(copied);
+            }
+            // In the first open window's name, so that it is written while another stays open.
+            if (each == open.getFirst() && !desk.opened.isEmpty()) {
+              Path browsed = folder.resolve(name + ".opened.txt").normalize();
+              Files.writeString(browsed, String.join("\n", desk.opened) + "\n");
+              written.add(browsed);
             }
           }
         }
@@ -858,6 +866,8 @@ public final class Script {
     final ArrayDeque<Answer> answers = new ArrayDeque<>(); // of the steps `dialog`, in order
     final List<String> unanswered = new ArrayList<>(); // dialogs that found no answer
     String wrong; // what was wrong with an answer, for the frame step to say
+    final List<String> opened = new ArrayList<>(); // the addresses the app opened, in order
+    final Browser browser = (uri, failed) -> opened.add(uri.toString());
 
     /** The dialogs of the script's windows: each takes the next answer of a `dialog` step. */
     final Dialogs dialogs = new Dialogs() {
@@ -927,6 +937,7 @@ public final class Script {
       chosen = first;
       app.windows(this);
       app.dialogs(dialogs);
+      app.browser(browser);
     }
 
     Win current() {
@@ -1066,6 +1077,7 @@ public final class Script {
       app.holdPosts = true;
       app.windows(this);
       app.dialogs(dialogs);
+      app.browser(browser);
       w.resize(width, height, first.scale);
       int n = wins.size();
       if (options.isPositioned()) {
