@@ -736,9 +736,11 @@ public final class Script {
     boolean sized;
     boolean open = true;
     boolean fresh; // opened since the last frame step
+    boolean shown; // a frame step has drawn it
     boolean dropTarget = true;
     Runnable onClose;
     Runnable onClosed;
+    Runnable onShown;
 
     Win(Desk desk, App<?> app, String title) {
       this.desk = desk;
@@ -834,6 +836,11 @@ public final class Script {
     @Override
     public float screenScale() {
       return scale;
+    }
+
+    @Override
+    public void onShown(Runnable handler) {
+      onShown = handler;
     }
 
     @Override
@@ -1066,6 +1073,15 @@ public final class Script {
           }
         }
         due = again;
+      }
+      // Every open window has drawn now; it shows, so its handler runs in the next frame step.
+      for (Win w : open()) {
+        if (!w.shown) {
+          w.shown = true;
+          if (w.onShown != null) {
+            w.app.request(w.onShown);
+          }
+        }
       }
     }
 

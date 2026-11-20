@@ -288,6 +288,21 @@ class WindowsScriptTest {
   }
 
   @Test
+  void aWindowTellsOnceInTheFrameAfterItsFirst() throws IOException {
+    App<Board> app = board();
+    Script.run("size 300 100", app, out);
+    List<String> told = new ArrayList<>();
+    app.windows().of(app).onShown(() -> told.add("main"));
+    Windows.Handle a =
+        app.windows().open("A", 60, 60, Window.options(), new App<>(new Object(), s -> el()));
+    a.onShown(() -> told.add("A"));
+    Script.run("frame", app, out);
+    assertEquals(List.of(), told, "a task of the frame after the first");
+    Script.run("frame\nframe", app, out);
+    assertEquals(List.of("main", "A"), told);
+  }
+
+  @Test
   void stepsNameTheWindowsThereAre() {
     Script.Failure failure =
         assertThrows(Script.Failure.class, () -> Script.run("""
