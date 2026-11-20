@@ -3,6 +3,7 @@ package com.rethinkj.ui.window;
 import static java.lang.foreign.ValueLayout.ADDRESS;
 import static java.lang.foreign.ValueLayout.JAVA_INT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -30,7 +31,8 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * The file dialogs' callback, called through its upcall stub as SDL calls it, on this thread and
  * on another, with the lists SDL hands over; and what the dialogs give SDL. Only the tests that
- * close a window under its file dialog open real ones, which they close.
+ * close a window under its file dialog or press Escape in it open real ones, which they close;
+ * they run only with {@code -Dwindows.tests=true}.
  */
 class SystemDialogsTest {
 
@@ -133,6 +135,8 @@ class SystemDialogsTest {
   void anEmptyListAndZenitysEmptyLineAreACancel() throws Exception {
     assertTrue(call(List.of(), -1, false).choice().cancelled());
     assertTrue(call(List.of(""), -1, true).choice().cancelled(), "zenity's cancel");
+    // Windows' cancel, with the index of the filter the dialog showed.
+    assertEquals(-1, call(List.of(), 0, true).choice().filter(), "a cancel chooses no filter");
   }
 
   @Test
@@ -301,6 +305,13 @@ class SystemDialogsTest {
         bind("GetWindowThreadProcessId", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS));
     static final MethodHandle IS_WINDOW =
         bind("IsWindow", FunctionDescriptor.of(JAVA_INT, ADDRESS));
+    static final MethodHandle IS_WINDOW_VISIBLE =
+        bind("IsWindowVisible", FunctionDescriptor.of(JAVA_INT, ADDRESS));
+    static final MethodHandle GUI_THREAD_INFO =
+        bind("GetGUIThreadInfo", FunctionDescriptor.of(JAVA_INT, JAVA_INT, ADDRESS));
+    static final MethodHandle IS_CHILD =
+        bind("IsChild", FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS));
+    static final MethodHandle POST_MESSAGE = bind("PostMessageW", Win32.POST_MESSAGE);
 
     private static MethodHandle bind(String name, FunctionDescriptor descriptor) {
       return Linker.nativeLinker()
@@ -334,6 +345,75 @@ class SystemDialogsTest {
 
   private static boolean isWindow(MemorySegment hwnd) throws Throwable {
     return (int) User32.IS_WINDOW.invokeExact(hwnd) != 0;
+  }
+
+  private static boolean isVisible(MemorySegment hwnd) {
+    try {
+      return (int) User32.IS_WINDOW_VISIBLE.invokeExact(hwnd) != 0;
+    } catch (Throwable t) {
+      throw new AssertionError(t);
+    }
+  }
+
+  /**
+   * Presses Escape in a dialog: posts the key to the control of the dialog that has the focus, or
+   * to the dialog itself, without taking the foreground from whatever has it.
+   */
+  private static void pressEscape(MemorySegment dialog) throws Throwable {
+    int thread = (int) User32.WINDOW_PROCESS.invokeExact(dialog, MemorySegment.NULL);
+    // Thread 0 would ask about the foreground's thread, which may be another app's.
+    assertNotEquals(0, thread, "the dialog is still there");
+    MemorySegment focus = dialog;
+    try (Arena arena = Arena.ofConfined()) {
+      MemorySegment info = arena.allocate(72, 8); // GUITHREADINFO
+      info.set(JAVA_INT, 0, 72); // cbSize
+      if ((int) User32.GUI_THREAD_INFO.invokeExact(thread, info) != 0) {
+        MemorySegment focused = info.get(ADDRESS, 16); // hwndFocus
+        if ((int) User32.IS_CHILD.invokeExact(dialog, focused) != 0) {
+          focus = focused;
+        }
+      }
+    }
+    // WM_KEYDOWN with scan code 1 only: the dialog cancels on it, and may be gone before a key up.
+    int posted = (int) User32.POST_MESSAGE.invokeExact(focus, 0x0100, 0x1BL, 0x0001_0001L);
+    assertNotEquals(0, posted, "Escape was posted");
+  }
+
+  /**
+   * The user presses Escape in a dialog with filters: SDL reports the index of the filter the
+   * dialog showed then, here the first one's, but a cancel chooses none, as on Linux.
+   */
+  @Test
+  void escapeInADialogWithFiltersCancelsItWithoutAFilter() throws Throwable {
+    Desktop.assumeWindows();
+    assumeTrue(File.separatorChar == '\\', "Windows' dialog reports its filter on a cancel");
+    Window window = shown("rethinkj escape in its dialog");
+    MemorySegment hwnd = ((WindowHandle.Win32) window.handle()).hwnd();
+    List<FileDialog.Choice> chosen = new java.util.concurrent.CopyOnWriteArrayList<>();
+    List<String> failed = new java.util.concurrent.CopyOnWriteArrayList<>();
+    try {
+      Desktop.settle();
+      new SystemDialogs(window)
+          .file(
+              FileDialog.open("Escape").filter("SQL", "sql").filter("Text", "txt", "md"),
+              chosen::add,
+              failed::add);
+      assertTrue(
+          Desktop.pollUntil(
+              () -> Win32.ownedDialogs(hwnd).stream().anyMatch(SystemDialogsTest::isVisible)),
+          "it opened");
+      Desktop.settle();
+      pressEscape(Win32.ownedDialogs(hwnd).stream()
+          .filter(SystemDialogsTest::isVisible)
+          .findFirst()
+          .orElseThrow());
+      assertTrue(Desktop.pollUntil(() -> !chosen.isEmpty() || !failed.isEmpty()), "it answered");
+      assertEquals(List.of(), failed);
+      assertTrue(chosen.getFirst().cancelled(), String.valueOf(chosen));
+      assertEquals(-1, chosen.getFirst().filter(), "a cancel chooses no filter");
+    } finally {
+      window.close(); // and with it a dialog that is still open
+    }
   }
 
   /**
