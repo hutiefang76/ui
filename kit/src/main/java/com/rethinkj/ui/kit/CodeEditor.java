@@ -7,6 +7,7 @@ import com.rethinkj.ui.FieldState;
 import com.rethinkj.ui.Highlighter;
 import com.rethinkj.ui.Key;
 import com.rethinkj.ui.Len;
+import com.rethinkj.ui.Side;
 import com.rethinkj.ui.Spans;
 import com.rethinkj.ui.Style;
 import java.util.List;
@@ -18,8 +19,8 @@ import java.util.function.Consumer;
  * markers in a gutter on a rail of its own, the caret's line highlighted, the bracket at the caret
  * and its partner marked, the other occurrences of the word at the caret marked, guides in the
  * indentation, the tokens colored by a highlighter ({@link Sql}) and the app's diagnostics
- * underlined. Given the app, it also finds and replaces ({@link Find}), goes to a line, and has the
- * commands of {@link Command}.
+ * underlined. Given the app, it also finds and replaces ({@link Find}), goes to a line, goes from
+ * diagnostic to diagnostic with F8 and Shift+F8, and has the commands of {@link Command}.
  *
  * <pre>{@code
  * codeEditor(app, state.sql, state.editor, Sql.of(), value -> state.sql = value)
@@ -28,7 +29,8 @@ import java.util.function.Consumer;
  *
  * <p>Its keys are the field's {@link El#onKey} handler and its marks the field's {@link
  * El#decorate decorator}: a view adds its own and keeps the editor's with {@link El#onKeyFirst} and
- * {@link El#alsoDecorate}.
+ * {@link El#alsoDecorate}. The message that F8 shows is the field's {@link El#whenFocusWithin}
+ * look, which a look of the view's own replaces.
  */
 public final class CodeEditor {
 
@@ -151,6 +153,8 @@ public final class CodeEditor {
     // The editor of the last build, and what it was built with, for the commands.
     private El editor;
     private String lineComment;
+    // F8: where the diagnostics start whose message shows at the caret; -1 while none does.
+    private int shown = -1;
 
     /**
      * Whether the editor has its find bar and the keys that open it (Control+F, Control+H, F3,
@@ -263,6 +267,12 @@ public final class CodeEditor {
      * lines under them on the editor as {@code underline <from>-<to>} while their lines are in
      * view, and the marker in the line's cell, with the messages of its errors as {@code error=}
      * and of its warnings as {@code warning=}.
+     *
+     * <p>Given the app, F8 puts the caret at the start of the next diagnostic after it, Shift+F8 at
+     * the start of the one before, round at the ends, and the message of those that start there
+     * shows above the caret, as their marker's tooltip, while the editor has the focus, until the
+     * caret leaves them or Escape hides it; a tree dump shows it as an overlay of the editor, {@code role=tooltip} with the
+     * message as the label. Without diagnostics the keys do nothing.
      */
     public State diagnostics(String text, List<Diagnostic> diagnostics) {
       this.diagnostics = List.copyOf(diagnostics);
@@ -313,8 +323,9 @@ public final class CodeEditor {
 
   /**
    * The editor with its find bar ({@link Find}: Control+F, Control+H, F3, Control+G), also in the
-   * field's menu as Find and Replace, and its {@link Command commands}, which edit through the app
-   * ({@link App#edit}).
+   * field's menu as Find and Replace, F8 and Shift+F8 to go to the next diagnostic and the one
+   * before ({@link State#diagnostics}), and its {@link Command commands}, which edit through the
+   * app ({@link App#edit}).
    *
    * @param app the app the editor is in; null for an editor without find and commands
    */
@@ -389,6 +400,10 @@ public final class CodeEditor {
           }
         })
         .gutter(line -> cell(theme, state, diagnostics, line), rail);
+    El message = message(theme, state, diagnostics);
+    if (message != null) { // as a tooltip of the keyboard's, only while the editor has the focus
+      editor.whenFocusWithin(e -> e.overlay(message));
+    }
     // The rail starts at the frame: the field's padding lies after the gutter.
     editor.style().paddingLeft = Len.ZERO;
     if (app == null) {
@@ -397,6 +412,9 @@ public final class CodeEditor {
     state.editor = editor;
     state.lineComment = highlighter == null ? null : highlighter.lineComment();
     editor.onKey(k -> {
+      if (diagnosticKey(app, state, editor, diagnostics, message, k)) {
+        return true;
+      }
       Command command = command(k);
       if (command == null) {
         return false;
@@ -552,6 +570,89 @@ public final class CodeEditor {
       }
     }
     return El.el();
+  }
+
+  /**
+   * The message of the diagnostics that start where F8 put the caret, above the caret, where a
+   * list of completions does not cover it, on the look of their marker's tooltip while the caret
+   * is at their start or inside them; else null, and F8's place is forgotten.
+   */
+  private static El message(Theme theme, State state, List<Diagnostic> diagnostics) {
+    if (state.shown < 0) {
+      return null;
+    }
+    int to = -1;
+    boolean error = false;
+    StringBuilder messages = new StringBuilder();
+    for (Diagnostic d : diagnostics) {
+      if (d.from == state.shown) {
+        to = Math.max(to, Math.max(d.from, d.to));
+        error |= d.severity == Severity.ERROR;
+        messages.append(messages.isEmpty() ? "" : "\n").append(d.message);
+      }
+    }
+    boolean in = state.caret == state.shown || (state.caret > state.shown && state.caret < to);
+    if (to < 0 || !in) {
+      state.shown = -1;
+      return null;
+    }
+    Texts texts = Texts.CURRENT.get();
+    return Tooltip.panel(
+            theme,
+            messages.isEmpty() ? (error ? texts.error() : texts.warning()) : messages.toString(),
+            Tooltip.options()
+                .kind(error ? Callout.Kind.DANGER : Callout.Kind.WARNING)
+                .side(Side.TOP, Style.Align.START))
+        .key("message") // beside a tooltip of the view's on the editor
+        .atCaret();
+  }
+
+  /**
+   * F8 and Shift+F8, which put the caret at the start of the next diagnostic or the one before and
+   * show its message, and Escape, which hides the message where it shows; whether the key was one
+   * of them.
+   */
+  private static boolean diagnosticKey(
+      App<?> app, State state, El editor, List<Diagnostic> diagnostics, El message, Key k) {
+    if (k.name().equals("Escape")
+        && k.modifiers() == 0
+        && message != null
+        && app.tree().shownOverlays().contains(message)) { // not while scrolled away
+      state.shown = -1;
+      state.shown = -1;
+      return true;
+    }
+    if (!k.name().equals("F8") || (k.modifiers() & ~Key.SHIFT) != 0 || diagnostics.isEmpty()) {
+      return false;
+    }
+    int at = next(diagnostics, state.caret, k.modifiers() == Key.SHIFT);
+    app.select(editor, at, at);
+    state.caret = at;
+    state.anchor = at;
+    state.shown = at;
+    return true;
+  }
+
+  /**
+   * The start of the first diagnostic after {@code caret}, or {@code back} of the last before it;
+   * round at the ends.
+   */
+  private static int next(List<Diagnostic> diagnostics, int caret, boolean back) {
+    int[] starts = diagnostics.stream().mapToInt(Diagnostic::from).sorted().toArray();
+    if (back) {
+      for (int i = starts.length - 1; i >= 0; i--) {
+        if (starts[i] < caret) {
+          return starts[i];
+        }
+      }
+      return starts[starts.length - 1];
+    }
+    for (int start : starts) {
+      if (start > caret) {
+        return start;
+      }
+    }
+    return starts[0];
   }
 
   /** The word at the caret, if nothing or exactly a word is selected; else null. */
