@@ -28,9 +28,27 @@ Control visibility from your state by attaching `root.overlay(open ? dialog : nu
 
 For a standalone dialog window, register `root.onKey(Dialog.enterPresses(button))` on the container holding the form, passing the button element from the same view build.
 
-**Stacked dialogs:** By default, a dialog uses key `"dialog"`. If you open a second dialog on top of another (for example, a "Discard changes?" prompt), chain a unique `.key("discard")` on the second dialog.
-
 Custom frameless title bars remain usable behind a dialog so users can still move or close the window.
+
+## A dialog over a dialog
+
+A dialog can open a second one over itself, such as a form that asks for a detail or a "Discard changes?" prompt. Attach both to the root, the second one last so it lies on top. Every dialog has the key `"dialog"`, so chain a unique `.key(...)` on the second one:
+
+<Shot src="examples/docs/dialog-stack/stacked-{theme}" alt="An Add property dialog with a combo box and a Value field over a wider New connection dialog, both over a dimmed window" />
+
+```java snippet="dialog-stack"
+```
+
+Keys go to the dialog on top; while it is covered, the `onKey` handlers of the one below get none:
+
+- **Escape** goes to the focused element first, so a focused combo box with its list open closes the list. An Escape that nothing in the top dialog takes calls the top dialog's `onDismiss` only; the one below stays open.
+- **Enter** stays in the top dialog: the focused control takes it, as a combo box that opens its list, or it presses the top dialog's default button. It never presses the default button of the dialog below, not even while the top dialog's is disabled.
+- **Focus:** when the top dialog closes, the focus goes back to the element that had it before the top dialog opened. That is the button that opened it if the button had the focus, as after Tab and Enter; a pointer press on a button leaves the focus where it was, such as in a field. The focus finds that element by its place among its siblings: if the build that closes the top dialog adds or removes siblings before it, as the line of properties in the example does, give the element a key (see [keys for identity](/docs/concepts/app#rules-for-your-view-function)).
+
+The script that checks these rules:
+
+```text snippet="dialog-stack-script"
+```
 
 ## Options
 

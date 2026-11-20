@@ -54,7 +54,13 @@ import java.util.stream.Stream;
  *
  * <p>Its key is {@code dialog}. Two dialogs open at once, as a question over a dialog, are
  * siblings among the root's overlays and need keys of their own: chain {@code .key("discard")}
- * onto the second, which then lies over the first with its own scrim.
+ * onto the second, which then lies over the first with its own scrim. While it is covered, the
+ * {@link El#onKey} handlers of the first get no keys: Escape goes to the focused element of the
+ * second, as a combo box that closes its list, and else calls the second's {@code onDismiss};
+ * Enter acts in the second, never on the default button of the first. When the second closes, the
+ * focus goes back to the element that had it before the second opened, found by its place among
+ * its siblings: one before which the build that closes the second adds or removes siblings needs
+ * a {@link El#key}.
  */
 public final class Dialog {
 
