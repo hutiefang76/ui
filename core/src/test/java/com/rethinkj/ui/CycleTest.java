@@ -8,8 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.rethinkj.ui.motion.Spring;
+import com.rethinkj.ui.text.TextLibraries;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntFunction;
+import java.util.function.ObjDoubleConsumer;
 import org.junit.jupiter.api.Test;
 
 /** {@link El#cycle}: looks that go round on the app's clock while their element is shown. */
@@ -188,6 +191,46 @@ class CycleTest {
     app.advance(0.25);
     app.frame();
     assertEquals(0.25, seen.getLast(), 1e-9);
+  }
+
+  @Test
+  void aRowThatScrollingKeepsInViewCyclesFromWhatLayoutGaveIt() {
+    TextLibraries.assumeLoaded();
+    ObjDoubleConsumer<El> halve = (e, phase) -> e.opacity(e.opacity() / 2);
+    IntFunction<El> field = i -> El.text("row " + i)
+        .editable(e -> {})
+        .readOnly()
+        .multiline()
+        .child(el().key("range").range(0, 3).cycle(1, halve));
+    App<Object> app = new App<>(
+        new Object(),
+        state -> col().key("list").w(100).h(120).rows(1000, 20, i -> switch (i
+            % 3) { // the cycle on the row, on a range of it or of a field in it
+          case 0 -> el().key("row-" + i).cycle(1, halve);
+          case 1 -> field.apply(i).key("row-" + i);
+          default -> el().key("row-" + i).child(field.apply(i).grow(1));
+        }));
+    app.resize(100, 120, 1);
+    app.frame();
+    app.wheel(50, 50, 0, 70); // row 9 shows; rows 3 to 5 were in view and still are
+    app.frame();
+    assertEquals("row-3", app.tree().children().get(3).key());
+    assertEquals(0.5f, app.tree().children().get(3).opacity());
+    assertEquals(0.5f, find(app.tree().children().get(4), "range").opacity());
+    assertEquals(0.5f, find(app.tree().children().get(5), "range").opacity());
+  }
+
+  private static El find(El el, String key) {
+    if (key.equals(el.key())) {
+      return el;
+    }
+    for (El child : el.children()) {
+      El found = find(child, key);
+      if (found != null) {
+        return found;
+      }
+    }
+    return null;
   }
 
   @Test
