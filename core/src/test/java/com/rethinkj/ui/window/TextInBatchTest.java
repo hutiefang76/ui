@@ -5,6 +5,7 @@ import static java.lang.foreign.ValueLayout.ADDRESS;
 import static java.lang.foreign.ValueLayout.JAVA_INT;
 import static java.lang.foreign.ValueLayout.JAVA_LONG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.rethinkj.ui.App;
@@ -20,6 +21,8 @@ import java.lang.foreign.SymbolLookup;
 import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -31,7 +34,8 @@ import org.junit.jupiter.api.Test;
  * keyboard layout ({@code TranslateMessage}) while SDL handles the batch; the press is put into
  * SDL's queue before them. Posted keys come before the characters Windows makes of them, unlike
  * a keyboard's, whose character follows its key; which key's character a field takes is {@code
- * KeyTextTest}'s. Windows only; skipped where the window gets no keyboard focus.
+ * KeyTextTest}'s. Also characters without a key, which Windows sends to the window without SDL
+ * knowing of them. Windows only; skipped where the window gets no keyboard focus.
  */
 class TextInBatchTest {
 
@@ -142,6 +146,87 @@ class TextInBatchTest {
           "the keys after the click are in the field");
       assertEquals("abc", app.state().name);
     }
+  }
+
+  /**
+   * A character without a key, as an input method, the emoji panel or SendInput's {@code
+   * KEYEVENTF_UNICODE} sends it, that arrives alone while the window's thread waits in SDL for an
+   * event, with text input off, so that SDL queues no event of it: the window ends the wait, as a
+   * key would, and the loop draws it at once. A try counts only where the window's wake ended the
+   * wait and the character came alone: not where an event of the pointer, a window or the system
+   * ended it, or one that the window made itself, as of a change of the system's colors.
+   */
+  @Test
+  void aCharacterWithoutAKeyEndsTheWaitForEvents() throws InterruptedException {
+    try (Window window = Window.open(TITLE, 240, 100);
+        Arena arena = Arena.ofConfined()) {
+      Desktop.settle();
+      List<WindowEvent> events = new ArrayList<>();
+      window.listener(events::add);
+      MemorySegment hwnd = ((WindowHandle.Win32) window.handle()).hwnd();
+      MemorySegment ended = arena.allocate(Sdl.EVENT_SIZE, 8); // the event that ended the wait
+      Thread waiting = Thread.currentThread();
+      boolean counted = false; // a try in which the character came alone
+      for (char character : CHARACTERS.toCharArray()) {
+        Window.pollEvents();
+        events.clear();
+        AtomicBoolean over = new AtomicBoolean();
+        AtomicInteger posted = new AtomicInteger(-1);
+        // From another thread once this one waits in SDL.
+        Thread sender = Thread.ofPlatform().daemon().start(() -> {
+          while (!over.get()) {
+            if (inWait(waiting)) {
+              try {
+                posted.set((int) POST_MESSAGE.invokeExact(hwnd, WM_CHAR, (long) character, 1L));
+              } catch (Throwable _) {
+                posted.set(0);
+              }
+              return;
+            }
+            Thread.onSpinWait();
+          }
+        });
+        boolean woken = Sdl.waitEventTimeout(ended, 5_000);
+        over.set(true);
+        sender.join();
+        Window.pollEvents();
+        List<String> texts = new ArrayList<>();
+        boolean alone = true; // no other event came, which the window may have woken the wait for
+        for (WindowEvent e : events) {
+          switch (e) {
+            case WindowEvent.KeyText(String text) -> texts.add(text);
+            case WindowEvent.TextInput(String text) -> texts.add(text);
+            default -> alone = false;
+          }
+        }
+        if (woken && ended.get(JAVA_INT, Sdl.EVENT_TYPE) < EVENT_USER || !alone) {
+          continue; // something else ended the wait: try again with another character
+        }
+        assumeTrue(posted.get() != 0, "Skipped: PostMessage failed");
+        assertTrue(woken, "the character ended the wait");
+        assertEquals(List.of(String.valueOf(character)), texts);
+        counted = true;
+        break;
+      }
+      assertTrue(counted, "something else ended every wait");
+    }
+  }
+
+  /** The characters the test sends, one per try, each different. */
+  private static final String CHARACTERS = "éèêëàâäôöü";
+
+  /** The first type of the events that SDL leaves to apps, as {@link Window#wake}'s. */
+  private static final int EVENT_USER = 0x8000;
+
+  /** Whether the thread waits in SDL for an event ({@link Sdl#waitEventTimeout}). */
+  private static boolean inWait(Thread thread) {
+    for (StackTraceElement frame : thread.getStackTrace()) {
+      if (frame.getClassName().equals(Sdl.class.getName())
+          && frame.getMethodName().equals("waitEventTimeout")) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Test

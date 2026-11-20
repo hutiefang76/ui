@@ -703,7 +703,10 @@ public final class Window implements AutoCloseable {
       try (Arena arena = Arena.ofConfined()) {
         MemorySegment event = arena.allocate(Sdl.EVENT_SIZE, 8);
         event.set(JAVA_INT, Sdl.EVENT_TYPE, wakeType);
-        Sdl.pushEvent(event);
+        // Past the event watch, which ignores it and runs under a lock of SDL's: the window's
+        // thread wakes from inside it too (systemChar), and waiting here for that lock while
+        // holding LOCK could leave the two threads waiting for each other.
+        Sdl.addEvent(event);
       }
     }
   }
@@ -804,6 +807,10 @@ public final class Window implements AutoCloseable {
     }
     // A character without its key, as one sent as VK_PACKET, is plain text, as SDL would give it.
     queue(charOfKey ? new KeyText(text) : new TextInput(text));
+    // SDL queued no event of it, and only an event in its queue ends its wait: without a key
+    // before it, as from an input method, the emoji panel or SendInput, the loop would take it
+    // only with the next event.
+    wake();
   }
 
   /** A key down of a character sent as such ({@code VK_PACKET}), which SDL reports no key of. */
@@ -973,7 +980,8 @@ public final class Window implements AutoCloseable {
   /** SDL_EventFilter: SDL calls this for every event as it queues it. */
   private static boolean watch(MemorySegment userdata, MemorySegment event) {
     try {
-      // Events pushed on other threads, such as wake(), are only there to end a wait.
+      // Events that other threads push are only there to end a wait (wake() adds its own past
+      // this watch).
       if (Thread.currentThread() != thread || failure != null) {
         return true;
       }
