@@ -7,6 +7,7 @@ import static java.lang.foreign.ValueLayout.JAVA_FLOAT;
 import static java.lang.foreign.ValueLayout.JAVA_INT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.rethinkj.ui.App;
@@ -19,10 +20,13 @@ import com.rethinkj.ui.text.Font;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * A tab torn off and docked again in real windows, through one loop, with the pointer's events
@@ -101,6 +105,79 @@ class TabTearOffWindowTest {
       assertEquals(List.of("a", "c", "b", "d"), d.groups.main().tabs());
       assertEquals(2, d.groups.main().active());
       assertFalse(d.groups.isDragging());
+    }
+  }
+
+  /**
+   * Let go near the bottom right corner of the screen, the torn-off tab's window, which followed
+   * the pointer beyond the edges, comes wholly into the work area, frame and all, its close
+   * button within reach; also where the step that tears it off comes with the release.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void aTabLetGoNearTheEdgeOfTheScreenOpensWhollyInTheWorkArea(boolean withTheRelease) {
+    assumeWindows();
+    try (Window a =
+        Window.open("rethinkj tab tear-off test", 400, 160, Window.options().position(100, 200))) {
+      // Asked with a window open: before, SDL knows no video driver.
+      assumeTrue(Window.knowsPositions(), "Skipped: the compositor places the windows");
+      Docs d = new Docs();
+      d.app = new App<>(d, s -> s.view(s.groups.main()));
+      WindowLoop loop = new WindowLoop(a, d.app, (scene, w, h, sc) -> {})
+          .presenters(w -> (scene, wi, h, sc) -> {});
+      settle();
+      int[] from = Sdl.displayBounds(Window.displayOf(a.outer()), true);
+      // 10 pixels inside the work area's bottom right corner, in the main window's pixels.
+      float right = (from[0] + from[2] - 10 - a.x()) / a.unitsPerLogical();
+      float bottom = (from[1] + from[3] - 10 - a.y()) / a.unitsPerLogical();
+      int[] step = new int[1];
+      int[][] torn = new int[2][]; // its frame, and the work area of its display
+      loop.waits((millis, holdBack) -> {
+        switch (step[0]) {
+          case 0 -> { // b, out of the bar and down
+            if (millis == -1) {
+              button(a, true, 52, 17);
+              motion(a, 52, 40);
+              motion(a, 52, 120);
+              step[0]++;
+              if (withTheRelease) { // in the same batch: to the corner, let go
+                motion(a, right, bottom);
+                button(a, false, right, bottom);
+                step[0]++;
+              }
+            }
+          }
+          case 1 -> {
+            // While its window follows the pointer the loop may poll it, without an idle wait.
+            if (d.groups.groups().size() == 2) { // its window is open: to the corner, let go
+              motion(a, right, bottom);
+              button(a, false, right, bottom);
+              step[0]++;
+            }
+          }
+          default -> {
+            if (millis == -1) { // the release and its frame are over
+              if (d.groups.groups().size() == 2) {
+                Window b = d.groups.groups().get(1).window().window();
+                Sdl.syncWindow(b.sdlWindow()); // X11 moves it later
+                torn[0] = b.outer();
+                // Of the display it lies mostly on, which may be one beside the first.
+                torn[1] = Sdl.displayBounds(Window.displayOf(torn[0]), true);
+              }
+              loop.stop();
+            }
+          }
+        }
+      });
+      run(loop, () -> "b torn off and let go: " + d.log + " " + d.groups.groups());
+
+      assertEquals(2, d.groups.groups().size(), "b stays in a window of its own");
+      int[] frame = torn[0];
+      int[] in = torn[1];
+      String where = Arrays.toString(frame) + " in " + Arrays.toString(in);
+      assertTrue(frame[0] >= in[0] && frame[1] >= in[1], where);
+      assertTrue(frame[0] + frame[2] <= in[0] + in[2], "its right edge: " + where);
+      assertTrue(frame[1] + frame[3] <= in[1] + in[3], "its bottom edge: " + where);
     }
   }
 

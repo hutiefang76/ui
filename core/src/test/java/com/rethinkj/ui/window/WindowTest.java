@@ -126,6 +126,32 @@ class WindowTest {
     }
   }
 
+  /** A torn-off window, larger than the work area and let go near its far corner, as one. */
+  @Test
+  void aWindowLargerThanTheWorkAreaComesWhollyIntoIt() {
+    try (Window window = Window.open(TITLE, 300, 200)) {
+      // Asked with a window open: before, SDL knows no video driver.
+      assumeTrue(Window.knowsPositions(), "Skipped: the compositor places the windows");
+      Desktop.settle();
+      int[] first = Sdl.displayBounds(Window.displayOf(window.outer()), true);
+      Sdl.setWindowSize(window.sdlWindow(), first[2] + 200, first[3] + 100);
+      window.moveTo(first[0] + first[2] - 50, first[1] + first[3] - 50);
+      Desktop.settle();
+      // Of the display it lies mostly on now, which may be one beside the first.
+      int[] area = Sdl.displayBounds(Window.displayOf(window.outer()), true);
+      assertTrue(window.keepInWorkArea());
+      Desktop.settle();
+      int[] outer = window.outer();
+      String where = outer[0] + "," + outer[1] + " " + outer[2] + "x" + outer[3];
+      assertTrue(
+          outer[0] >= area[0]
+              && outer[1] >= area[1]
+              && outer[0] + outer[2] <= area[0] + area[2]
+              && outer[1] + outer[3] <= area[1] + area[3],
+          where + " in the work area " + area[2] + "x" + area[3]);
+    }
+  }
+
   @Test
   void opensAndClosesAFramelessWindow() {
     Window window = Window.open(TITLE, 320, 200, Window.options().frameless());

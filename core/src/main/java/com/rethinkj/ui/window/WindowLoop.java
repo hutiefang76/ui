@@ -159,7 +159,9 @@ public final class WindowLoop {
   private boolean tracking;
   private float[] polled;
   private boolean captured; // the loop captured the pointer for a press that moved on
-  private Entry releasedIn; // the window whose app got the release, until it draws
+  // The windows whose apps got a release, until they draw: one batch may hold the releases of
+  // presses in two windows.
+  private final Set<Entry> releasedIn = new HashSet<>();
   private boolean focusAfterRelease;
 
   /**
@@ -255,7 +257,7 @@ public final class WindowLoop {
       if (isOpen()) {
         window.moveTo(x, y);
         // During the press, or in the frame that handles its release, whose drag step ends it.
-        moved = pressed != null || releasedIn != null;
+        moved = pressed != null || !releasedIn.isEmpty();
       }
     }
 
@@ -328,7 +330,10 @@ public final class WindowLoop {
         throw e;
       }
       Entry entry = new Entry(window, app, presenter, true);
-      entry.focusAfterPress = options.isUnderPointer() && pressed != null;
+      // During a press, or in the frame that handles its release, where a step that came with the
+      // release tears a tab off.
+      entry.focusAfterPress =
+          options.isUnderPointer() && (pressed != null || !releasedIn.isEmpty());
       add(entry);
       if (running) {
         start(entry);
@@ -659,8 +664,7 @@ public final class WindowLoop {
           e.fresh = false;
           e.input = false;
           draw(e, false);
-          if (e == releasedIn) {
-            releasedIn = null;
+          if (releasedIn.remove(e)) {
             focusAfterRelease = true;
           }
           for (Entry other : invalidateOthers(e)) {
@@ -685,13 +689,24 @@ public final class WindowLoop {
       }
       if (focusAfterRelease) { // the frame that handled the release has run
         focusAfterRelease = false;
+        // A window opened under the pointer during a press that came in the same pass as the
+        // release still follows it: it waits for the release of that press, and for the frames
+        // of the other releases still due, whose steps may still move it.
+        boolean up = pressed == null && releasedIn.isEmpty();
         for (Entry e : List.copyOf(entries)) {
-          if (e.moved && e.isOpen()) { // the app moved it during the press, maybe off screen
+          if (!e.isOpen()) {
+            continue;
+          }
+          if (e.focusAfterPress) { // opened under the pointer, as a torn-off tab: wholly in view
+            if (up) {
+              e.window.keepInWorkArea();
+            }
+          } else if (e.moved) { // the app moved it during the press, maybe off screen
             e.window.keepReachable();
           }
         }
         for (Entry e : List.copyOf(entries)) {
-          if (e.focusAfterPress) {
+          if (e.focusAfterPress && up) {
             e.focusAfterPress = false;
             e.raise(); // if it is still open: shown without the focus, it takes it now
           }
@@ -877,6 +892,9 @@ public final class WindowLoop {
    */
   private void shut(Entry e, List<Throwable> to) {
     entries.remove(e);
+    if (releasedIn.remove(e)) { // closed before it drew the release: that is over too
+      focusAfterRelease = true;
+    }
     e.app.onPost(null);
     if (e.window.isOpen()) {
       e.window.listener(null);
@@ -1117,7 +1135,7 @@ public final class WindowLoop {
   }
 
   private void released(Entry in) {
-    releasedIn = in;
+    releasedIn.add(in);
     pressed = null;
     tracking = false;
     polled = null;

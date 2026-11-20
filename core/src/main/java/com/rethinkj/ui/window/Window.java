@@ -152,7 +152,9 @@ public final class Window implements AutoCloseable {
      * {@code DWMWA_TRANSITIONS_FORCEDISABLED}, so that no empty frame zooms in before its first
      * frame), and without taking the keyboard focus from the window the drag began in ({@code
      * SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN}), whose keys, Escape among them, reach the drag as they
-     * did. A {@link WindowLoop} gives it the focus when the press ends, if it is still open.
+     * did. A {@link WindowLoop} gives it the focus when the press ends, if it is still open, and
+     * moves it wholly into the work area of its display, which it may reach beyond where it was
+     * let go near an edge of the screen.
      */
     public Options underPointer() {
       underPointer = true;
@@ -423,6 +425,10 @@ public final class Window implements AutoCloseable {
   private final boolean underPointer;
   private final Placement placement;
   // Where the window is when it is neither maximized nor minimized, for placement().
+  // Where moveTo moved the window last, until keepInWorkArea or keepReachable has seen it.
+  private int askedX;
+  private int askedY;
+  private boolean asked;
   private int normalX;
   private int normalY;
   private float normalWidth;
@@ -1355,6 +1361,9 @@ public final class Window implements AutoCloseable {
     checkOpen();
     Sdl.setWindowPosition(sdl, x, y);
     rethrow();
+    askedX = x;
+    askedY = y;
+    asked = true;
   }
 
   /** The position of the content's top left corner on the desktop, in screen coordinates. */
@@ -1379,48 +1388,164 @@ public final class Window implements AutoCloseable {
    * frameless window the rows at its top that the view marks as its drag area ({@link
    * WindowPart#DRAG}), inside the work area (the display less the taskbar or a dock) of the
    * display it lies mostly on, from top to bottom and across for {@link #REACHABLE} logical
-   * pixels or its whole width. A window that the app moved during a press, as a torn-off tab's
-   * window that follows the pointer, can be let go with its title bar above the top of the screen
-   * or beyond another edge, where nothing grabs it any more: a {@link WindowLoop} calls this for
-   * it when the press ends, and a window opens so ({@link Options#position}). An app calls it
-   * after moving a window by itself. Nothing moves while the window is maximized, minimized or
+   * pixels or its whole width. A window that the app moved during a press, as one that follows
+   * the pointer with its only tab, can be let go with its title bar above the top of the screen or
+   * beyond another edge, where nothing grabs it any more: a {@link WindowLoop} calls this for it
+   * when the press ends (and moves one that opened during the press wholly into the work area,
+   * {@link Options#underPointer}), and a window opens so ({@link Options#position}). An app calls
+   * it after moving a window by itself. Nothing moves while the window is maximized, minimized or
    * fullscreen, nor on Wayland, where the compositor places windows.
    *
    * @return whether the window moved
    */
   public boolean keepReachable() {
+    asked = false; // moved by it, or by the user since
+    return keep();
+  }
+
+  /**
+   * Like {@link #keepReachable}, but moves the window wholly into that work area, frame and all:
+   * for a window that opened under the pointer during a press ({@link Options#underPointer}), as
+   * a torn-off tab's, which {@link WindowLoop} moves so when the press ends. Let go near an edge,
+   * it would reach beyond it, its close button out of reach. A window larger than the work area
+   * first becomes as small as the area, or as its minimum size, and where it is still larger, its
+   * top left corner goes to the area's.
+   *
+   * @return whether the window moved
+   */
+  boolean keepInWorkArea() {
     checkOpen();
-    if (!knowsPositions()
-        || (Sdl.getWindowFlags(sdl)
-                & (Sdl.WINDOW_MAXIMIZED | Sdl.WINDOW_MINIMIZED | Sdl.WINDOW_FULLSCREEN))
-            != 0) {
+    if (!placeable()) {
       return false;
     }
-    Sdl.getWindowPosition(sdl, ints);
-    int x = ints.get(JAVA_INT, 0);
-    int y = ints.get(JAVA_INT, 4);
-    int w = units(width);
-    int h = units(height);
-    int[] frame = Sdl.windowBordersSize(sdl); // top, left, bottom, right
-    if (frame == null || frameless) {
-      frame = new int[4];
+    // Where the app moved it last, as the drag did: X11 may not have moved it there yet, and
+    // may not say so. Elsewhere a move is made when asked, and the window is where it says.
+    int[] at = asked && handle instanceof WindowHandle.Xlib ? new int[] {askedX, askedY} : null;
+    asked = false;
+    boolean moved = false;
+    int display = 0;
+    // Twice at most: on a display of another scale it changes its size as it arrives, frame and
+    // all.
+    for (int round = 0; round < 2; round++) {
+      if (!Sdl.syncWindow(sdl) && moved) { // X11 moves and sizes it later
+        return true; // where it is is not known yet: a second move could undo the first
+      }
+      int[] frame = frame();
+      int[] outer = outer(at, frame);
+      // Measured where it may not be: if it fits there, it is measured again where it is.
+      boolean unsure = at != null;
+      at = null;
+      if (!moved) { // after a move, the display it was moved into, which X11 may not show yet
+        display = displayOf(outer);
+      }
+      int[] area = display == 0 ? null : Sdl.displayBounds(display, true);
+      if (area == null) {
+        return moved;
+      }
+      if (outer[2] > area[2] || outer[3] > area[3]) {
+        Sdl.setWindowSize(
+            sdl,
+            Math.min(outer[2], area[2]) - frame[1] - frame[3],
+            Math.min(outer[3], area[3]) - frame[0] - frame[2]);
+        Sdl.syncWindow(sdl);
+        int[] content = {outer[0] + frame[1], outer[1] + frame[0]}; // stays where it was
+        frame = frame();
+        outer = outer(content, frame); // at least as large as its minimum size
+        unsure = true;
+      }
+      int[] by = inside(outer, area);
+      if (by[0] == 0 && by[1] == 0) {
+        if (unsure) {
+          continue;
+        }
+        return moved;
+      }
+      Sdl.setWindowPosition(sdl, outer[0] + frame[1] + by[0], outer[1] + frame[0] + by[1]);
+      rethrow();
+      moved = true;
     }
-    int[] bar = frame[0] > 0
-        ? new int[] {x - frame[1], y - frame[0], w + frame[1] + frame[3], frame[0]}
-        : dragArea(x, y);
-    int display = Sdl.displayForRect(
-        x - frame[1], y - frame[0], w + frame[1] + frame[3], h + frame[0] + frame[2]);
+    return moved;
+  }
+
+  private boolean keep() {
+    checkOpen();
+    if (!placeable()) {
+      return false;
+    }
+    int[] frame = frame(); // top, left, bottom, right
+    int[] outer = outer(null, frame);
+    int display = displayOf(outer);
     int[] area = display == 0 ? null : Sdl.displayBounds(display, true);
     if (area == null) {
       return false;
     }
+    int[] bar = frame[0] > 0
+        ? new int[] {outer[0], outer[1], outer[2], frame[0]}
+        : dragArea(outer[0] + frame[1], outer[1] + frame[0]);
     int[] by = reachable(bar, area, units(REACHABLE));
     if (by[0] == 0 && by[1] == 0) {
       return false;
     }
-    Sdl.setWindowPosition(sdl, x + by[0], y + by[1]);
+    Sdl.setWindowPosition(sdl, outer[0] + frame[1] + by[0], outer[1] + frame[0] + by[1]);
     rethrow();
     return true;
+  }
+
+  /** Whether the app may move the window: not on Wayland, nor while maximized or minimized. */
+  private boolean placeable() {
+    return knowsPositions()
+        && (Sdl.getWindowFlags(sdl)
+                & (Sdl.WINDOW_MAXIMIZED | Sdl.WINDOW_MINIMIZED | Sdl.WINDOW_FULLSCREEN))
+            == 0;
+  }
+
+  /** The system's frame around the content: top, left, bottom and right; none if frameless. */
+  private int[] frame() {
+    int[] frame = frameless ? null : Sdl.windowBordersSize(sdl);
+    return frame == null ? new int[4] : frame;
+  }
+
+  /** x, y, width and height of the window on the screen, frame and all. */
+  int[] outer() {
+    checkOpen();
+    return outer(null, frame());
+  }
+
+  /**
+   * Like {@link #outer()}, with this frame, and with the content's top left corner at {@code at}
+   * in place of where SDL has it, unless null.
+   */
+  private int[] outer(int[] at, int[] frame) {
+    Sdl.getWindowPosition(sdl, ints);
+    int x = at != null ? at[0] : ints.get(JAVA_INT, 0);
+    int y = at != null ? at[1] : ints.get(JAVA_INT, 4);
+    Sdl.getWindowSize(sdl, ints);
+    int w = ints.get(JAVA_INT, 0);
+    int h = ints.get(JAVA_INT, 4);
+    return new int[] {x - frame[1], y - frame[0], w + frame[1] + frame[3], h + frame[0] + frame[2]};
+  }
+
+  /**
+   * The display a rectangle on the screen lies mostly on, as x, y, width and height; where it
+   * lies on none, the nearest. 0 if there is none.
+   */
+  static int displayOf(int[] rect) {
+    int best = 0;
+    long most = 0;
+    for (int display : Sdl.displays()) {
+      int[] b = Sdl.displayBounds(display, false);
+      if (b == null) {
+        continue;
+      }
+      long across =
+          Math.min((long) rect[0] + rect[2], (long) b[0] + b[2]) - Math.max(rect[0], b[0]);
+      long down = Math.min((long) rect[1] + rect[3], (long) b[1] + b[3]) - Math.max(rect[1], b[1]);
+      if (across > 0 && down > 0 && across * down > most) {
+        most = across * down;
+        best = display;
+      }
+    }
+    return best != 0 ? best : Sdl.displayForRect(rect[0], rect[1], rect[2], rect[3]);
   }
 
   /**
@@ -1557,6 +1682,22 @@ public final class Window implements AutoCloseable {
       dx = area[0] + area[2] - across - bar[0];
     }
     return new int[] {dx, dy};
+  }
+
+  /**
+   * How far a window has to move to lie wholly in a work area; where it is wider or higher than
+   * the area, so far that its left or top edge is the area's.
+   *
+   * @param window x, y, width and height of the window on the screen, frame and all
+   * @param area x, y, width and height of the work area
+   * @return the move across and down
+   */
+  static int[] inside(int[] window, int[] area) {
+    long x =
+        Math.clamp(window[0], area[0], Math.max(area[0], (long) area[0] + area[2] - window[2]));
+    long y =
+        Math.clamp(window[1], area[1], Math.max(area[1], (long) area[1] + area[3] - window[3]));
+    return new int[] {(int) (x - window[0]), (int) (y - window[1])};
   }
 
   /**
