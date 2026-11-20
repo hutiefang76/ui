@@ -78,6 +78,32 @@ class FormGroupsTest {
   }
 
   @Test
+  void aGroupWithoutATitleHasNoHeadingAndItsFieldsKeepFocusWhenTheTitleGoes() throws IOException {
+    String[] title = {"Login"};
+    App<Object> app = new App<>(
+        new Object(),
+        s -> col()
+            .wFull()
+            .hFull()
+            .padding(16)
+            .child(Form.form(
+                Form.Labels.BESIDE,
+                Form.group(
+                        title[0],
+                        field("User", TextField.textField("", null, v -> {}).key("user")),
+                        field(
+                            "Password",
+                            TextField.passwordField("", null, v -> {}).key("password")))
+                    .divided())));
+    dump(app, 400, "focus #password");
+    title[0] = null;
+    String dump = dump(app, 400, "");
+    assertTrue(line(dump, "#password").contains(" focused"), dump);
+    assertFalse(line(dump, "role=group").contains("label="), dump);
+    assertFalse(dump.contains("role=heading"), dump);
+  }
+
+  @Test
   void nullsAreLeftOutAlsoAGroupOfNullsAndARowOfOneIsThatField() throws IOException {
     String dump = dump(
         400,
