@@ -295,6 +295,13 @@ public final class App<S> {
   // list's identity, for the lists the last fillRows found; a list that comes back tells again.
   private final Map<Object, Long> toldRows = new HashMap<>();
   private final Set<Object> rowLists = new HashSet<>(); // those it found, while it walks
+  // Likewise the rows in view each list with an onRowsInView handler told last, and those lists
+  // as the last walk of fillRows found them, to tell once the frame has settled.
+  private final Map<Object, Long> toldInView = new HashMap<>();
+  private final Map<Object, El> inViewLists = new LinkedHashMap<>();
+  // The onRowsBuilt handlers due of the lists that also have an onRowsInView one, by identity: they
+  // run with that one at the end of the frame, as one input with one rebuild.
+  private final Map<Object, Runnable> heldRows = new HashMap<>();
   // The sizes the El#onResize handlers were told, by identity, of the elements of the last build.
   private Map<Object, Long> toldSizes = new HashMap<>();
   private int ringColor = FOCUS_RING;
@@ -3321,6 +3328,7 @@ public final class App<S> {
       cycling = El.cycles(root, time, width, height, true);
       drawn |= cycling;
     }
+    tellInView(); // the rows as the frame shows them, after everything that places elements
     long input = inputEnd - start - inputBuild;
     timing = new Timing(input, buildNanos, System.nanoTime() - start - input - buildNanos);
     return drawn;
@@ -3861,8 +3869,10 @@ public final class App<S> {
     float far = Float.POSITIVE_INFINITY;
     rowsWanted = false;
     rowKeyHooks = false;
+    inViewLists.clear();
     boolean built = fillRows(root, new ArrayList<>(), 0, 0, -far, far, false);
     if (!rowGoals.isEmpty() && followRowGoals()) {
+      inViewLists.clear();
       built |= fillRows(root, new ArrayList<>(), 0, 0, -far, far, false); // the rows there
     }
     toldRows.keySet().retainAll(rowLists);
@@ -4011,6 +4021,9 @@ public final class App<S> {
     if (el.onRowsBuilt() != null) {
       rowLists.add(Animator.identities(path).getLast());
     }
+    if (el.onRowsInView() != null) {
+      inViewLists.put(Animator.identities(path).getLast(), el);
+    }
     // Rows as high as their content may cover less or more than estimated: a second pass, or a
     // third, builds the rows the measured heights show.
     for (int pass = 0; range != null && pass < 3; pass++) {
@@ -4130,6 +4143,11 @@ public final class App<S> {
     long rows = (long) first << 32 | last & 0xFFFFFFFFL;
     Long before = toldRows.put(id, rows);
     if (before == null || before != rows) {
+      if (list.onRowsInView() != null) {
+        heldRows.put(id, () -> handler.accept(first, last)); // see tellInView
+        return;
+      }
+      heldRows.remove(id); // of a handler since gone: these rows are newer
       queued.add(
           () -> { // after the input of this frame, or in the next one
             handler.accept(first, last);
@@ -4137,6 +4155,45 @@ public final class App<S> {
             return true;
           });
     }
+  }
+
+  /**
+   * Queues the {@link El#onRowsInView} handlers of the lists that show other rows than they told,
+   * at the end of a frame: not the rows of a layout between its inputs that it does not show. The
+   * {@link El#onRowsBuilt} handler held for such a list runs with it, as one input.
+   */
+  private void tellInView() {
+    toldInView.keySet().retainAll(inViewLists.keySet());
+    inViewLists.forEach((id, list) -> {
+      El.RowsHandler handler = list.onRowsInView();
+      Runnable built = heldRows.remove(id);
+      long rows = list.rowsInView();
+      Long before = toldInView.put(id, rows);
+      boolean moved = before == null || before != rows;
+      if (built != null || moved) {
+        queued.add(() -> {
+          handled = true;
+          try {
+            if (built != null) {
+              built.run();
+            }
+          } finally {
+            if (moved) {
+              handler.accept((int) (rows >> 32), (int) rows);
+            }
+          }
+          return true;
+        });
+      }
+    });
+    for (Runnable built : heldRows.values()) { // of a list gone since
+      queued.add(() -> {
+        built.run();
+        handled = true;
+        return true;
+      });
+    }
+    heldRows.clear();
   }
 
   /**
