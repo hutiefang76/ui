@@ -183,6 +183,16 @@ public final class App<S> {
   private final ArrayDeque<BooleanSupplier> queued = new ArrayDeque<>();
   // What a handler queues while an input runs, such as a focus or a scroll: it runs next.
   private final List<BooleanSupplier> follow = new ArrayList<>();
+  // The El#onResize handlers the last layout told a new size, by the element's identity, which
+  // rebuild runs before the frame draws, and how many times a frame builds again for them. What
+  // they ask for, such as a focus, runs first in the next frame, in the order asked.
+  private final Map<Object, BooleanSupplier> resized = new LinkedHashMap<>();
+  private static final int RESIZE_ROUNDS = 3;
+  private int resizeRounds; // in this frame
+  private final List<BooleanSupplier> asked = new ArrayList<>();
+  // A build before the frame's last gave other sizes, or a view did not settle: the next rebuild
+  // tells them.
+  private boolean resizeDue;
   // What post() took on any thread, until the app's thread moves it into queued.
   private final ConcurrentLinkedQueue<BooleanSupplier> posted = new ConcurrentLinkedQueue<>();
   private final AtomicBoolean woken = new AtomicBoolean(); // wake ran for what posted holds
@@ -1604,14 +1614,14 @@ public final class App<S> {
 
   /**
    * Whether the next {@link #frame} has handlers to run at once that the last one queued, such as
-   * the {@link El#onResize} handlers of elements that layout gave another size, or input and
-   * tasks that arrived since. A runner that draws a single frame when the system asks for one, as
-   * a {@link com.rethinkj.ui.window.WindowLoop} does during a live resize, draws again while this
-   * holds (a few times at most), so that a toolbar that gives way to the new width shows so in
-   * the same step instead of one step late.
+   * the {@link El#onRowsBuilt} handler of a list that built other rows, the {@link El#onResize}
+   * handlers of a view that did not settle in its frame, or input and tasks that arrived since. A
+   * runner that draws a single frame when the system asks for one, as a {@link
+   * com.rethinkj.ui.window.WindowLoop} does during a live resize, draws again while this holds (a
+   * few times at most), so that what they change shows in the same step instead of one step late.
    */
   public boolean handlersWaiting() {
-    return !queued.isEmpty();
+    return !queued.isEmpty() || resizeDue;
   }
 
   /**
@@ -1624,7 +1634,7 @@ public final class App<S> {
    * idle window can wait for input alone.
    */
   public double nextChange() {
-    if (!queued.isEmpty() || cycling || rowsWanted) {
+    if (!queued.isEmpty() || resizeDue || cycling || rowsWanted) {
       // handlers that a frame queued, such as El#onRowsBuilt, an El#cycle, or rows that the
       // measured heights of a list show and the last frame had no passes left for
       return time;
@@ -3105,6 +3115,7 @@ public final class App<S> {
    */
   public boolean frame() {
     frames++;
+    resizeRounds = 0;
     if (keyPressed != null && keyPressKey == null && time >= keyPressUntil) {
       keyPressed = null; // the look of a key that is up ends; wanted() then differs from shown
     }
@@ -3118,7 +3129,7 @@ public final class App<S> {
     takeDue();
     while (!queued.isEmpty()) {
       if (handled || changedOutside) { // the next input goes to a tree built from the state now
-        rebuild(handled); // after invalidate alone with its rows: an action may look for them
+        build(handled, false); // after invalidate alone with its rows: an action may look for them
         drawn = true;
         if (!selectedByBuild.isEmpty()) {
           // A FieldState's selection the build applied reaches onSelect as a handler's input
@@ -3153,6 +3164,7 @@ public final class App<S> {
     stale |= shownFor();
     ran |= handled;
     stale |= handled || !Objects.equals(focusId, wasFocused) || ring != hadRing;
+    stale |= resizeDue; // sizes changed in the input, or a view has not settled
     stale |= blink(focused == null ? null : focused.editor());
     if (stale) { // the rebuild builds all rows anyway
       drawn |= scrolled;
@@ -3172,14 +3184,21 @@ public final class App<S> {
       // Twice when the first build moved other elements under the still pointer, as a key that
       // scrolls a list does, or an onHoverFor handler ran: the looks are those of what the
       // pointer is over in the tree on screen.
-      for (int pass = 0; pass < 2 && stale; pass++) {
-        rebuild(false);
-        // A caret that the app's string moved, or of a new field: its handler is told, once.
-        if (tellSelections()) {
-          rebuild(false);
+      try {
+        for (int pass = 0; pass < 2 && stale; pass++) {
+          rebuild();
+          // A caret that the app's string moved, or of a new field: its handler is told, once.
+          if (tellSelections()) {
+            rebuild();
+          }
+          List<El> path = pointed();
+          stale = !wanted(path, Animator.identities(path)).equals(shown);
         }
-        List<El> path = pointed();
-        stale = !wanted(path, Animator.identities(path)).equals(shown);
+      } finally {
+        for (int i = asked.size() - 1; i >= 0; i--) {
+          queued.addFirst(asked.get(i)); // first in the next frame, as after their handler
+        }
+        asked.clear();
       }
       stale = false;
       drawn = true;
@@ -3214,6 +3233,51 @@ public final class App<S> {
   }
 
   /**
+   * Builds the view at the end of a frame, after its input, as {@link #build} does; then runs the
+   * {@link El#onResize} handlers that layout told a new size, as handlers of input, and builds
+   * again from what they changed, until no size changes or after {@link #RESIZE_ROUNDS} rounds in
+   * the frame: a toolbar shows what fits a new width in the frame that has it, and input goes to
+   * the tree as it was shown.
+   */
+  private void rebuild() {
+    resizeDue = false;
+    try {
+      build(false, true);
+      while (resizeRounds < RESIZE_ROUNDS && !resized.isEmpty()) {
+        resizeRounds++;
+        tellResized();
+        build(false, true);
+      }
+    } finally {
+      // What is left, of a view that has not settled or after a throw: the next frame's last
+      // build tells it again, from its own tree.
+      if (!resized.isEmpty()) {
+        toldSizes.keySet().removeAll(resized.keySet());
+        resized.clear();
+        resizeDue = true;
+      }
+    }
+  }
+
+  /** Runs the handlers in {@link #resized} as handlers of input; what they ask for waits. */
+  private void tellResized() {
+    dispatching = true;
+    try {
+      for (Object id : List.copyOf(resized.keySet())) {
+        resized.get(id).getAsBoolean();
+        resized.remove(id); // told: a throw leaves only it and those after it
+      }
+    } catch (RuntimeException | Error e) {
+      handled = true; // as in frame: the next input gets a tree built anew
+      throw e;
+    } finally {
+      dispatching = false;
+      asked.addAll(follow);
+      follow.clear();
+    }
+  }
+
+  /**
    * Builds the view from the state, gives it the looks of the moment and its fields their editing
    * state, lays it out, hands it to the animator and builds the rows of its virtual lists; then
    * finds the focus in it again and places the fields' carets and the scrollbars.
@@ -3222,8 +3286,10 @@ public final class App<S> {
    *     row, the rows, the carets and the bars are then left to {@link #settle}, before the next
    *     input that needs them: most keys need only the elements around the focus, and the rows
    *     are most of what a rebuild of a data grid costs.
+   * @param last whether this is the frame's last build, after its input, which tells the {@link
+   *     El#onResize} handlers; another only notes that sizes changed, for the last to tell
    */
-  private void rebuild(boolean between) {
+  private void build(boolean between, boolean last) {
     List<Object> ids = Animator.identities(pointed());
     El built = WindowState.CURRENT.with(
         new WindowState(active, maximized, scale), () -> view.apply(state));
@@ -3238,7 +3304,12 @@ public final class App<S> {
     // The sizes layout gave, before motion takes them along; an element that left is forgotten.
     Map<Object, Long> sizes = new HashMap<>();
     tellSizes(root, new ArrayList<>(), sizes);
-    toldSizes = sizes;
+    if (!last) { // the input after it may change the tree: the last build tells from its own
+      resizeDue |= !sizes.equals(toldSizes); // also an element that left, to be forgotten
+      resized.clear();
+    } else {
+      toldSizes = sizes;
+    }
     animator.update(root, time);
     untimed = true;
     stale = false;
@@ -3885,7 +3956,7 @@ public final class App<S> {
     return built;
   }
 
-  /** Queues the {@link El#onResize} handlers below {@code el} whose element has a new size. */
+  /** Collects the {@link El#onResize} handlers below {@code el} whose element has a new size. */
   private void tellSizes(El el, List<El> path, Map<Object, Long> sizes) {
     path.add(el);
     El.SizeHandler handler = el.onResize();
@@ -3897,7 +3968,7 @@ public final class App<S> {
       sizes.put(id, size);
       Long before = toldSizes.get(id);
       if (before == null || before != size) {
-        queued.add(() -> {
+        resized.put(id, () -> {
           handler.accept(w, h);
           handled = true;
           return true;
