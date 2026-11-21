@@ -482,6 +482,20 @@ class GridEditTest {
     assertEquals("commit 0,5 pending", ledger.log.getLast(), "Escape changed nothing");
   }
 
+  @Test
+  void aRefusedChoiceLeavesTheListOpenOnItWithTheMessage() throws IOException {
+    Ledger ledger = new Ledger(T, 40);
+    ledger.refuse = "Not now";
+    App<Ledger> app = start(ledger);
+    run(app, "press #cell-0-5\nframe\nkey Enter\nframe\nadvance 1\nframe");
+    run(app, "press #item-1\nframe\nadvance 1\nframe"); // a press closes the list first
+    String dump = app.tree().dump();
+    assertTrue(dump.contains("role=menu"), "the list stays open: " + dump);
+    assertTrue(line(app, "item-1").contains(" current"), "on the refused choice: " + dump);
+    assertTrue(dump.contains("role=alert label=\"Not now\""), dump);
+    assertEquals(0, ledger.selection.row(), "the cursor stays");
+  }
+
   /** More choices than a menu shows at once: the editor is a field that filters them. */
   @Test
   void aLongEnumerationFiltersItsChoicesAsTyped() throws IOException {
@@ -822,6 +836,12 @@ class GridEditTest {
     run(app, "key End\ntype \"!\"\nkey Enter\nframe");
     assertEquals("commit 0,1 Ada Lovelace!", ledger.log.getLast());
     assertEquals(1, ledger.selection.row());
+
+    run(app, "key F2\nframe\nframe\nkey End\ntype \"?\"\nframe");
+    app.post(() -> ledger.custom = null); // the app takes its editor away while it is open
+    run(app, "await\nframe");
+    assertNotNull(CellEditorTest.find(app, "field"), "the grid's own field takes over");
+    assertEquals("Grace Lovelace?", ledger.selection.draft(), "with the draft");
   }
 
   /** The app adds a row in a handler and hands the editor of the row to append on at once. */
