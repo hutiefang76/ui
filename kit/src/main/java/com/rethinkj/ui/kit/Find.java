@@ -175,7 +175,8 @@ public final class Find {
     }
 
     private Search.Query search() {
-      return new Search.Query(query, matchCase, wholeWord, regex);
+      String words = field == null ? "" : field.text().wordCharacters();
+      return new Search.Query(query, matchCase, wholeWord, regex, words);
     }
 
     private For target(int length) {
@@ -536,7 +537,8 @@ public final class Find {
               state.jumpText = null;
               if (found != null
                   && state.field != null
-                  && state.field.text().string().equals(text)) {
+                  && state.field.text().string().equals(text)
+                  && target.equals(state.target(text.length()))) { // same query and words
                 select(state, found);
               }
             },
