@@ -77,14 +77,20 @@ el 0,0 1040x720
           el 243,212 28x1
         el 273,174 9x9
         el 265,204 9x9
-        el #public.order_item/order_item_product_fk role=graphics-symbol label="order_item_product_fk" 760,298 37x8 value="Dimmed"
-          el 762,301 35x1
-        el 755,303 8x12
-          el 758,305 1x9
-        el 489,313 268x8
-          el 489,316 267x1
-        el 758,301 9x9
-        el 750,308 9x9
+        el #public.order_item/order_item_product_fk role=graphics-symbol label="order_item_product_fk" 776,298 21x8 value="Dimmed"
+          el 778,301 19x1
+        el 771,303 8x31
+          el 774,305 1x28
+        el 514,332 259x8
+          el 516,335 256x1
+        el 509,318 8x16
+          el 512,320 1x13
+        el 489,313 22x8
+          el 489,316 21x1
+        el 774,301 9x9
+        el 766,327 9x9
+        el 512,327 9x9
+        el 504,316 9x9
         el #public.product/product_category_fk role=graphics-symbol label="product_category_fk" 274,331 30x8 value="Dimmed"
           el 274,334 30x1
         el 270,335 8x1
@@ -121,17 +127,17 @@ el 0,0 1040x720
         el 512,449 9x9
         el #public.order/order_customer_fk role=graphics-symbol label="order_customer_fk" 529,225 22x8 value="Highlighted"
           el 531,228 20x2
-        el 524,230 8x28
-          el 527,232 2x24
-        el 267,255 260x8
-          el 269,258 256x2
-        el 262,214 8x44
-          el 265,216 2x40
+        el 524,230 8x39
+          el 527,232 2x35
+        el 267,268 260x6
+          el 269,269 256x2
+        el 262,214 8x55
+          el 265,216 2x51
         el 243,212 22x5
           el 243,212 20x2
         el 527,228 10x10
-        el 519,250 10x10
-        el 265,250 10x10
+        el 519,261 10x10
+        el 265,261 10x10
         el 257,212 10x10
         el #public.order/order_shipping_address_fk role=graphics-symbol label="order_shipping_address_fk" 521,244 30x8 value="Highlighted"
           el 523,247 28x2
@@ -141,7 +147,7 @@ el 0,0 1040x720
           el 489,151 28x2
         el 519,239 10x10
         el 511,151 10x10
-        el #public.order/order_billing_address_fk role=graphics-symbol label="order_billing_address_fk" 513,263 38x7 value="Highlighted"
+        el #public.order/order_billing_address_fk role=graphics-symbol label="order_billing_address_fk" 513,262 38x6 value="Highlighted"
           el 515,265 36x2
         el 508,161 8x104
           el 511,163 2x100

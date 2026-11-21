@@ -77,17 +77,17 @@ el 0,0 1040x720
         el 265,204 9x9
         el #public.order/order_customer_fk role=graphics-symbol label="order_customer_fk" 529,226 22x8
           el 531,229 20x1
-        el 524,231 8x27
-          el 527,233 1x24
-        el 267,256 259x7
-          el 269,259 256x1
-        el 262,214 8x44
-          el 265,216 1x41
+        el 524,231 8x37
+          el 527,233 1x34
+        el 267,268 259x6
+          el 269,269 256x1
+        el 262,214 8x54
+          el 265,216 1x51
         el 243,209 21x8
           el 243,212 20x1
         el 527,229 9x9
-        el 519,251 9x9
-        el 265,251 9x9
+        el 519,261 9x9
+        el 265,261 9x9
         el 257,212 9x9
         el #public.order/order_shipping_address_fk role=graphics-symbol label="order_shipping_address_fk" 522,244 29x8
           el 524,247 27x1
@@ -97,7 +97,7 @@ el 0,0 1040x720
           el 489,152 29x1
         el 520,239 9x9
         el 512,152 9x9
-        el #public.order/order_billing_address_fk role=graphics-symbol label="order_billing_address_fk" 514,263 37x8
+        el #public.order/order_billing_address_fk role=graphics-symbol label="order_billing_address_fk" 514,263 37x5
           el 516,266 35x1
         el 509,161 8x104
           el 512,163 1x101
@@ -114,14 +114,20 @@ el 0,0 1040x720
           el 736,210 28x1
         el 766,274 9x9
         el 758,210 9x9
-        el #public.order_item/order_item_product_fk role=graphics-symbol label="order_item_product_fk" 760,298 37x8
-          el 762,301 35x1
-        el 755,303 8x12
-          el 758,305 1x9
-        el 489,313 268x8
-          el 489,316 267x1
-        el 758,301 9x9
-        el 750,308 9x9
+        el #public.order_item/order_item_product_fk role=graphics-symbol label="order_item_product_fk" 776,298 21x8
+          el 778,301 19x1
+        el 771,303 8x31
+          el 774,305 1x28
+        el 514,332 259x8
+          el 516,335 256x1
+        el 509,318 8x16
+          el 512,320 1x13
+        el 489,313 22x8
+          el 489,316 21x1
+        el 774,301 9x9
+        el 766,327 9x9
+        el 512,327 9x9
+        el 504,316 9x9
         el #public.product/product_category_fk role=graphics-symbol label="product_category_fk" 274,331 30x8
           el 274,334 30x1
         el 270,335 8x1
