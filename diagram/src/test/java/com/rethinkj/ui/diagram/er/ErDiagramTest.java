@@ -560,6 +560,7 @@ class ErDiagramTest {
         key -
         key -
         key -
+        key -
         frame
         snap collapsed
         """, app, out);

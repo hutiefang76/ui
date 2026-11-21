@@ -688,7 +688,7 @@ public final class ErDiagram {
 
     /** A size of text in the diagram, which stays readable where the tables show less. */
     private float readable(float size, float zoom) {
-      return size * Math.max(zoom, style.skeleton());
+      return size * Math.max(zoom, style.readable());
     }
 
     private El frame(Node node, float zoom) {

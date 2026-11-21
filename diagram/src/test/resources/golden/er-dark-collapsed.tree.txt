@@ -29,22 +29,22 @@ el 0,0 720x360
         el 285,216 70x7
           text label="database" "\u{F0D7}" 287,215 9x9
           text "billing" 297,214 25x11
-    el #shop.order/order_customer_fk role=graphics-symbol label="order_customer_fk" 359,173 11x8
-      el 359,176 11x1
-    el 355,169 8x7
-      el 358,169 1x8
-    el 350,165 8x8
-      el 350,168 9x1
-    el 358,174 3x3
-    el 356,168 3x3
-    el #shop.order/order_billing_fk role=graphics-symbol label="order_billing_fk" 362,173 8x8
-      el 362,176 8x1
-    el 358,177 8x7
-      el 361,177 1x8
-    el 350,181 11x8
-      el 350,184 12x1
-    el 361,176 3x3
-    el 359,182 3x3
+    el #shop.order/order_customer_fk role=graphics-symbol label="order_customer_fk" 359,172 11x8
+      el 359,175 11x1
+    el 355,168 8x7
+      el 358,168 1x8
+    el 350,164 8x8
+      el 350,167 9x1
+    el 358,173 3x3
+    el 356,167 3x3
+    el #shop.order/order_billing_fk role=graphics-symbol label="order_billing_fk" 362,172 8x8
+      el 362,175 8x1
+    el 358,176 8x7
+      el 361,176 1x8
+    el 350,180 11x8
+      el 350,183 12x1
+    el 361,175 3x3
+    el 359,181 3x3
     el #shop.category/category_parent_fk role=graphics-symbol label="category_parent_fk" 350,200 7x6
       el 350,201 8x1
     el 354,199 8x2
