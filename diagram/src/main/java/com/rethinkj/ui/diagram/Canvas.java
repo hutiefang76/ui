@@ -29,6 +29,9 @@ import java.util.function.Function;
  * the nodes that lie inside it, so that a large diagram stays fast; in the first build, before
  * layout gave it a size, that is none.
  *
+ * <p>{@link Edge Edges} between the nodes' {@link Port ports} lie under the nodes, routed at right
+ * angles around them ({@link #canvas(Viewport, List, List, NodeContent, Consumer)}).
+ *
  * <p>Dragging empty space pans. Dragging a node reports it moved and {@link Node#pinned pinned} to
  * {@code onMove}, while the pointer moves, and as it was when the drag is cancelled. While the
  * canvas has the focus, {@code +} and {@code -} zoom in and out by a step around its center and
@@ -94,6 +97,93 @@ public final class Canvas {
   }
 
   /**
+   * Where an edge meets a node: at the height of a row inside it, on the side that faces the other
+   * end, left or right, which the canvas picks.
+   *
+   * @param node the key of the node
+   * @param y the row's middle, from the node's top at a zoom of 100 %
+   */
+  public record Port(String node, float y) {
+
+    public Port {
+      Objects.requireNonNull(node, "node");
+      if (!Float.isFinite(y)) {
+        throw new IllegalArgumentException("a port's height must be finite, was " + y);
+      }
+    }
+  }
+
+  /**
+   * What an edge shows where it meets a node. The crow's foot set reads from the line towards the
+   * node: a bar is one, a circle zero, a crow's foot many.
+   */
+  public enum Marker {
+    /** None: the line ends at the node. */
+    NONE,
+    /** {@code ||}: exactly one. */
+    ONE,
+    /** {@code o|}: zero or one. */
+    ZERO_OR_ONE,
+    /** {@code |<}: one or many. */
+    ONE_OR_MANY,
+    /** {@code o<}: zero or many. */
+    ZERO_OR_MANY,
+    /** A plain arrowhead pointing at the node. */
+    ARROW
+  }
+
+  /** How an edge stands out among the others. */
+  public enum Emphasis {
+    /** In the theme's strong border color. */
+    NORMAL,
+    /** In the accent color, wider ({@link EdgeStyle#highlightedWidth}) and on top of the others. */
+    HIGHLIGHTED,
+    /** In the strong border color mixed towards the canvas's ({@link EdgeStyle#dimming}). */
+    DIMMED
+  }
+
+  /**
+   * A line between the ports of two nodes, or of one node with itself. The canvas routes it with
+   * right angles and rounded bends around the nodes in the way, gives each edge a lane of its own
+   * beside the others, also where several meet at one port, and loops one from a node to itself on
+   * the side where fewer other edges end when both sides are as good.
+   *
+   * @param key unique among the canvas's nodes and edges; the element of its first run has it
+   * @param label what the edge is, for the tree dump and screen readers, and the text of its
+   *     tooltip; null for neither
+   * @param from where it starts
+   * @param to where it ends
+   * @param fromMarker what it shows at {@code from}
+   * @param toMarker what it shows at {@code to}
+   * @param emphasis how it stands out
+   * @param description a muted line below the label in its tooltip, null for none
+   */
+  public record Edge(
+      String key,
+      String label,
+      Port from,
+      Port to,
+      Marker fromMarker,
+      Marker toMarker,
+      Emphasis emphasis,
+      String description) {
+
+    public Edge {
+      Objects.requireNonNull(key, "key");
+      Objects.requireNonNull(from, "from");
+      Objects.requireNonNull(to, "to");
+      Objects.requireNonNull(fromMarker, "fromMarker");
+      Objects.requireNonNull(toMarker, "toMarker");
+      Objects.requireNonNull(emphasis, "emphasis");
+    }
+
+    /** A {@link Emphasis#NORMAL} edge without a description. */
+    public Edge(String key, String label, Port from, Port to, Marker fromMarker, Marker toMarker) {
+      this(key, label, from, to, fromMarker, toMarker, Emphasis.NORMAL, null);
+    }
+  }
+
+  /**
    * Builds what a node shows, at the size the zoom gives it: its {@link Node#width} and {@link
    * Node#height} times {@code zoom}. It is the canvas's level of detail: a node can show less when
    * zoomed out, such as only its name.
@@ -134,6 +224,12 @@ public final class Canvas {
     private double draggedY;
     private float draggedDx;
     private float draggedDy;
+    // The routes of the last build with edges and what they were routed from, so that a pan, a zoom
+    // or a hover does not route them again.
+    private List<Node> routedNodes;
+    private List<Edge> routedEdges;
+    private EdgeStyle routedStyle;
+    private List<Routing.Route> routes;
 
     /** A viewport at 100 % with the diagram's origin at the canvas's top left. */
     public Viewport() {
@@ -207,6 +303,21 @@ public final class Canvas {
       fittedWidth = -1;
     }
 
+    /** The edges' routes among these nodes, routed again only when one of them changed. */
+    List<Routing.Route> routes(List<Node> nodes, List<Edge> edges, EdgeStyle style) {
+      if (!nodes.equals(routedNodes) || !edges.equals(routedEdges) || !style.equals(routedStyle)) {
+        // Kept only once all of it worked, so that a failure leaves the last routes as they were.
+        List<Node> copiedNodes = List.copyOf(nodes);
+        List<Edge> copiedEdges = List.copyOf(edges);
+        List<Routing.Route> routed = Routing.route(copiedNodes, copiedEdges, style);
+        routedNodes = copiedNodes;
+        routedEdges = copiedEdges;
+        routedStyle = style;
+        routes = routed;
+      }
+      return routes;
+    }
+
     void fitIfDue(List<Node> nodes, float margin) {
       // Not while a node is dragged: its drag works at the zoom it began at.
       if (!fitting
@@ -270,11 +381,45 @@ public final class Canvas {
    * @param nodes the nodes, whose extent is the diagram's; none give an image of the margin alone
    * @param view builds the canvas at the viewport it is given, as the app's view does: everything
    *     it draws is in the image. Its size is set to the image's.
+   * @see #png(List, List, Function) for a canvas with edges, which can reach beyond the nodes
    * @throws IllegalArgumentException if the image would have more than 16 megapixels at a scale of
    *     1 as well, which is checked before anything is built
    */
   public static byte[] png(List<Node> nodes, Function<Viewport, El> view) {
+    return png(nodes.isEmpty() ? new double[4] : bounds(nodes), view);
+  }
+
+  /**
+   * As {@link #png(List, Function)}, for a canvas with these edges: cropped to the nodes and to the
+   * edges among them with their markers, so that an edge that loops outside the nodes is whole. The
+   * edges' sizes are those of {@link EdgeStyle#CURRENT} where it is called.
+   */
+  public static byte[] png(List<Node> nodes, List<Edge> edges, Function<Viewport, El> view) {
     double[] bounds = nodes.isEmpty() ? new double[4] : bounds(nodes);
+    EdgeStyle style = EdgeStyle.CURRENT.get();
+    List<Routing.Route> routes = Routing.route(nodes, edges, style);
+    for (int i = 0; i < routes.size(); i++) {
+      Routing.Route route = routes.get(i);
+      if (route != null) {
+        // How far its markers and its line reach beyond its points at most.
+        Edge edge = edges.get(i);
+        double reach = Math.max(Edges.reach(edge.fromMarker()), Edges.reach(edge.toMarker()))
+                * style.marker()
+            + (edge.emphasis() == Emphasis.HIGHLIGHTED ? style.highlightedWidth() : style.width())
+                / 2;
+        for (Routing.Point point : route.points()) {
+          bounds[0] = Math.min(bounds[0], point.x() - reach);
+          bounds[1] = Math.min(bounds[1], point.y() - reach);
+          bounds[2] = Math.max(bounds[2], point.x() + reach);
+          bounds[3] = Math.max(bounds[3], point.y() + reach);
+        }
+      }
+    }
+    return png(bounds, view);
+  }
+
+  /** The diagram from the left, top, right and bottom edge given, with the margin, as a PNG. */
+  private static byte[] png(double[] bounds, Function<Viewport, El> view) {
     float margin = Theme.CURRENT.get().space().xl();
     // At least a pixel, as a PNG has.
     float width = (float) Math.max(1, Math.ceil(bounds[2] - bounds[0] + 2 * margin));
@@ -315,6 +460,30 @@ public final class Canvas {
    */
   public static El canvas(
       Viewport viewport, List<Node> nodes, NodeContent content, Consumer<Node> onMove) {
+    return canvas(viewport, nodes, List.of(), content, onMove);
+  }
+
+  /**
+   * A canvas with edges between its nodes, which lie under the nodes, routed again whenever the
+   * nodes, the edges or {@link EdgeStyle#CURRENT} change, so that they follow a node that the user
+   * drags; a pan, a zoom or a hover reuses the routes. An edge whose node
+   * is not among the nodes is not drawn. Hovering an edge with a label shows its tooltip; pressing
+   * or dragging it does what it does on empty space. The edges' sizes are those of {@link
+   * EdgeStyle#CURRENT}.
+   *
+   * <p>In a tree dump the first run of each edge is {@code role=graphics-symbol} with its key and
+   * label, and the value {@link DiagramTexts#highlighted} or {@link DiagramTexts#dimmed} when it
+   * has that emphasis.
+   *
+   * @param edges the edges; later ones of the same emphasis lie on top
+   * @see #canvas(Viewport, List, NodeContent, Consumer)
+   */
+  public static El canvas(
+      Viewport viewport,
+      List<Node> nodes,
+      List<Edge> edges,
+      NodeContent content,
+      Consumer<Node> onMove) {
     Theme theme = Theme.CURRENT.get();
     DiagramTexts texts = DiagramTexts.CURRENT.get();
     viewport.fitIfDue(nodes, theme.space().xl());
@@ -336,6 +505,15 @@ public final class Canvas {
         })
         .onKey(key -> key(viewport, key))
         .onDrag(drag -> pan(viewport, left, top, drag));
+    if (!edges.isEmpty() && right > left && bottom > top) {
+      EdgeStyle style = EdgeStyle.CURRENT.get();
+      Edges.add(
+          canvas,
+          edges,
+          viewport.routes(nodes, edges, style),
+          new Edges.View(left, top, zoom, viewport.width, viewport.height),
+          style);
+    }
     for (Node node : nodes) {
       boolean inside = right > left
           && bottom > top
