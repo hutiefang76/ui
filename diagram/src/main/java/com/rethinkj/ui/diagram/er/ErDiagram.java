@@ -369,8 +369,9 @@ public final class ErDiagram {
    *
    * @param state what it shows, from the app's state
    * @param schemas the schemas with their tables, each table with a key of its own
-   * @param onPins told all pins whenever the user moves a table or arranges all, as {@link
-   *     State#pins()} gives them; null for none
+   * @param onPins told all pins when a drag of a table ends (nothing when Escape cancels it), after
+   *     each Shift+arrow step, and on Arrange all, as {@link State#pins()} gives them; null for
+   *     none
    * @param actions the app's own actions at the end of the bar, such as an export
    * @throws IllegalArgumentException if two tables have the same key
    */
@@ -403,6 +404,10 @@ public final class ErDiagram {
         .child(Button.button(Button.Variant.GHOST, texts.fit(), state.viewport::fit))
         .child(Button.button(Button.Variant.GHOST, texts.arrange(), state::arrange))
         .child(Button.button(Button.Variant.GHOST, texts.arrangeAll(), () -> {
+          if (state.viewport.dragging() != null) {
+            // Escape would put the dragged table back without telling onPins.
+            return;
+          }
           state.arrangeAll();
           told.accept(state.pins());
         }));
@@ -417,7 +422,9 @@ public final class ErDiagram {
             diagram::content,
             node -> {
               state.places.put(node.key(), new Place(node.x(), node.y(), node.pinned()));
-              told.accept(state.pins());
+              if (state.viewport.dragging() == null) {
+                told.accept(state.pins());
+              }
             })
         .label(texts.erDiagram())
         .onPress(() -> state.select(null))
@@ -893,6 +900,10 @@ public final class ErDiagram {
     if (key.modifiers() == Key.SHIFT && (dx != 0 || dy != 0)) {
       if (selected == null) {
         return false;
+      }
+      if (state.viewport.dragging() != null) {
+        // The pointer places the table until the drag ends or Escape puts it back.
+        return true;
       }
       Place place = state.places.get(selected.key);
       state.places.put(
