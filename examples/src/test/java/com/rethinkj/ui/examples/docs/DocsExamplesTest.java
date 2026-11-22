@@ -64,6 +64,8 @@ class DocsExamplesTest {
       Map.entry("dialog-danger", List.of("view")),
       Map.entry("dialog-prompt", List.of("view")),
       Map.entry("dialog-stack", List.of("stacked")),
+      Map.entry("drawer", List.of("open")),
+      Map.entry("drawer-inspector", List.of("open")),
       Map.entry("details", List.of("view", "children", "hidden")),
       Map.entry("properties-elements", List.of("view")),
       Map.entry("toolbar", List.of("view", "more")),
@@ -152,6 +154,8 @@ class DocsExamplesTest {
     overlays(all, "dialog-danger", Overlays::dialogDanger, 420, 220);
     overlays(all, "dialog-prompt", Overlays::dialogPrompt, 420, 240);
     overlays(all, "dialog-stack", Overlays::dialogStack, 440, 320);
+    overlays(all, "drawer", Overlays::drawer, 640, 360);
+    overlays(all, "drawer-inspector", Overlays::drawerInspector, 640, 360);
     overlays(all, "toast", Overlays::toast, 420, 200);
     overlays(all, "command-palette", Overlays::palette, 640, 360);
     grids(all, "grid", Grids::basic, 520, 300);
