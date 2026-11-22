@@ -72,6 +72,7 @@ class DocsExamplesTest {
       Map.entry("tooltip", List.of("shown")),
       Map.entry("tooltip-content", List.of("shown")),
       Map.entry("tooltip-kind", List.of("shown")),
+      Map.entry("toasts", List.of("shown")),
       Map.entry("dividers", List.of("view")),
       Map.entry("groups", List.of("view")),
       Map.entry("parts", List.of("view")),
@@ -157,6 +158,7 @@ class DocsExamplesTest {
     overlays(all, "drawer", Overlays::drawer, 640, 360);
     overlays(all, "drawer-inspector", Overlays::drawerInspector, 640, 360);
     overlays(all, "toast", Overlays::toast, 420, 200);
+    overlays(all, "toasts", Overlays::toasts, 460, 240);
     overlays(all, "command-palette", Overlays::palette, 640, 360);
     grids(all, "grid", Grids::basic, 520, 300);
     grids(all, "grid-open", Grids::opened, 360, 260);
