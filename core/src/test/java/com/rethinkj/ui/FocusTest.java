@@ -961,4 +961,40 @@ class FocusTest {
     app.frame();
     assertSame(find(app.tree(), "row2"), app.focused(), "also after a rebuild");
   }
+
+  @Test
+  void focusingADisplayNoneContainerDoesNothingAndAFadedElementIsRejected() {
+    boolean[] shown = {true};
+    App<boolean[]> app = start(
+        new App<>(shown, s -> {
+          El hidden = el().key("hidden").child(el().key("inside").focusable().size(10, 10));
+          hidden.style().display = Style.Display.NONE;
+          El root = row().size(100, 40).children(el().key("stay").focusable().size(20, 20), hidden);
+          if (s[0]) {
+            root.child(el().key("leaving").size(20, 20).motion(Spring.SNAP));
+          }
+          return root;
+        }),
+        100,
+        40);
+    app.focus(find(app.tree(), "stay"));
+    app.frame();
+    assertEquals("stay", focusedKey(app));
+
+    app.focus(find(app.tree(), "hidden"));
+    app.frame();
+    assertEquals(
+        "stay", focusedKey(app), "display: none has no focusable content and stays a no-op");
+
+    El leaving = find(app.tree(), "leaving");
+    shown[0] = false;
+    app.invalidate();
+    app.frame();
+    assertTrue(leaving.isExiting());
+    app.focus(leaving); // still in the tree while fading out
+    app.advance(1);
+    app.frame();
+    assertNull(find(app.tree(), "leaving"));
+    assertThrows(IllegalArgumentException.class, () -> app.focus(leaving));
+  }
 }

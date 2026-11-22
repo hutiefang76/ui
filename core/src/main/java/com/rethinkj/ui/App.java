@@ -2164,21 +2164,18 @@ public final class App<S> {
 
   /** Appends the path from {@code el} down to {@code target} if {@code target} is below it. */
   private static boolean pathTo(El el, El target, List<El> path) {
-    path.add(el);
-    if (el == target) {
-      return true;
+    if (el == null || target == null) {
+      return false;
     }
-    for (El child : el.children()) {
-      if (pathTo(child, target, path)) {
+    int start = path.size();
+    for (El cur = target; cur != null; cur = cur.parent) {
+      path.add(cur);
+      if (cur == el) {
+        Collections.reverse(path.subList(start, path.size()));
         return true;
       }
     }
-    for (El overlay : el.overlays()) {
-      if (pathTo(overlay, target, path)) {
-        return true;
-      }
-    }
-    path.removeLast();
+    path.subList(start, path.size()).clear();
     return false;
   }
 
@@ -2941,6 +2938,7 @@ public final class App<S> {
     buildNanos += System.nanoTime() - start;
     El.fix(built);
     shown = applyLooks(built, ids);
+    built.parent = null;
     root = built;
     builds++;
     attachEditors(root, new ArrayList<>()); // before layout, which shows a composition
@@ -3601,21 +3599,25 @@ public final class App<S> {
     path.add(el);
     float left = parentX + el.x();
     float top = parentY + el.y();
-    boolean relook = !relooking.isEmpty()
-        && el.isVirtualList()
-        && relooking.contains(Animator.identities(path).getLast());
+    Object id = null;
+    if (el.isVirtualList() || el.onRowsBuilt() != null || el.onRowsInView() != null) {
+      id = animator.identity(el);
+      if (id == null) {
+        id = Animator.identities(path).getLast();
+      }
+    }
+    boolean relook = !relooking.isEmpty() && el.isVirtualList() && relooking.contains(id);
     int[] range = el.wantedRows(left, top, clipLeft, clipRight, width, height, relook);
     boolean built = range.length != 0;
     if (el.onRowsBuilt() != null) {
-      rowLists.add(Animator.identities(path).getLast());
+      rowLists.add(id);
     }
     if (el.onRowsInView() != null) {
-      inViewLists.put(Animator.identities(path).getLast(), el);
+      inViewLists.put(id, el);
     }
     // Rows as high as their content may cover less or more than estimated: a second pass, or a
     // third, builds the rows the measured heights show.
     for (int pass = 0; range.length != 0 && pass < 3; pass++) {
-      Object id = Animator.identities(path).getLast();
       int asking = El.autofocuses();
       long start = System.nanoTime();
       el.makeRows(range[0], range[1], lookedRows(id)::contains);

@@ -36,7 +36,8 @@ class GutterTest {
   private El.Gutter numbers() {
     return line -> El.row()
         .padding(0, 4, 0, 0)
-        .onPress(() -> pressed.add("" + line.index()))
+        .onPress((clicks, mods, x, y) ->
+            pressed.add(line.index() + "@" + Math.round(x) + "," + Math.round(y)))
         .child(El.text((line.caret() ? ">" : "") + (line.index() + 1))
             .font(Font.mono())
             .fontSize(14));
@@ -127,7 +128,8 @@ class GutterTest {
     app.pointerDown(16, 14 + 18 * 3 + 9);
     app.pointerUp(16, 14 + 18 * 3 + 9);
     app.frame();
-    assertEquals(List.of("3"), pressed, "the press reached the cell of line 3");
+    assertEquals(
+        List.of("3@2,9"), pressed, "the press reached the cell of line 3 at its local point");
   }
 
   @Test

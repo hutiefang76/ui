@@ -95,6 +95,9 @@ final class Animator {
           parent.removeOverlay(entry.el);
         } else {
           parent.children().remove(entry.el);
+          if (entry.el.parent == parent) {
+            entry.el.parent = null;
+          }
         }
         forget(entry.el, entry.id);
         return true;
@@ -105,12 +108,11 @@ final class Animator {
 
   /** The identity of an element of the current tree, or null if it is not there. */
   Object identity(El el) {
-    for (Entry entry : entries.values()) {
-      if (entry.el == el) {
-        return entry.id;
-      }
+    if (el == null || el.animatorId == null) {
+      return null;
     }
-    return null;
+    Entry entry = entries.get(el.animatorId);
+    return entry != null && entry.el == el ? entry.id : null;
   }
 
   /**
@@ -381,6 +383,7 @@ final class Animator {
       }
     }
     entry.el = el;
+    el.animatorId = entry.id;
     el.measureScroll(); // from the layout, before the leaving children come back
     if (next.put(id, entry) != null) {
       throw new IllegalStateException("two siblings have the key '" + el.key()
@@ -492,6 +495,7 @@ final class Animator {
         }
       }
       if (!opacity.isAtRest(now)) {
+        child.parent = el;
         after.computeIfAbsent(anchor, k -> new ArrayList<>()).add(child);
         keep(child, ids[i], next, now);
       }

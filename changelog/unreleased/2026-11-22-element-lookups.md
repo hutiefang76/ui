@@ -1,0 +1,1 @@
+- Focus moves, key input, scrolling into view and overlays in large trees no longer scan the whole tree to find an element's identity or path.

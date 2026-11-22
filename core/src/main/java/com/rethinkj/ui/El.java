@@ -46,6 +46,7 @@ public final class El {
 
   private final Style style = new Style();
   private final List<El> children = new ArrayList<>();
+  El parent; // the element whose children or overlays hold this one, or null
   private String key;
   private String role;
   private String label;
@@ -143,6 +144,7 @@ public final class El {
   private ObjDoubleConsumer<El> cycle; // see #cycle
   private double cycleSeconds;
   double cycleSince; // for Animator: the app's time at which this identity got its cycle
+  Object animatorId; // for Animator: this element's identity in its last update
   // What layout and motion gave this element in this frame, which the cycle's look starts from.
   private boolean cycleBased;
   private float baseX, baseY, baseWidth, baseHeight, baseOpacity, baseTargetOpacity;
@@ -1816,6 +1818,7 @@ public final class El {
       scaleText(cell, scale, text.systemFonts());
       Flex.layout(cell, field.gutterWidth, rowHeight);
       cell.place(0, start.top() / scale, field.gutterWidth, rowHeight);
+      cell.parent = column;
       column.children.add(cell);
     }
     // The column stays where the content box is: the scroll that shifts it is added back.
@@ -1824,6 +1827,11 @@ public final class El {
         top + (float) scrollY,
         field.gutterWidth,
         text.contentHeight() / scale);
+    for (El old : children) {
+      if (old.parent == this) {
+        old.parent = null;
+      }
+    }
     children.clear();
     if (field.gutterRail != null) {
       float borderTop = style.borderTop.pixelsOrZero();
@@ -1837,8 +1845,10 @@ public final class El {
           (float) scrollY + borderTop,
           railWidth,
           railHeight);
+      field.gutterRail.parent = this;
       children.add(field.gutterRail);
     }
+    column.parent = this;
     children.add(column);
     scrollTo(scrollX, scrollY);
     text.shownIndex().gutterCells += starts.size();
@@ -2767,6 +2777,7 @@ public final class El {
         overlays = new ArrayList<>(1);
       }
       overlays.add(overlay);
+      overlay.parent = this;
       overlay.layer();
     }
     return this;
@@ -3085,6 +3096,7 @@ public final class El {
     noRows();
     if (child != null) {
       children.add(child);
+      child.parent = this;
     }
     return this;
   }
@@ -3276,6 +3288,9 @@ public final class El {
   void removeOverlay(El overlay) {
     if (overlays != null) {
       overlays.remove(overlay);
+      if (overlay.parent == this) {
+        overlay.parent = null;
+      }
     }
   }
 
@@ -4101,15 +4116,23 @@ public final class El {
         && rows.spanFrom == rows.builtFrom
         && rows.spanTo == rows.builtTo
         && Len.px(rowWidth()).equals(had.getFirst().style.width);
+    for (El old : had) {
+      if (old.parent == this) {
+        old.parent = null;
+      }
+    }
     children.clear();
     for (int i = from; i < to; i++) {
       El row = keeps && i >= hadFrom && i - hadFrom < had.size() ? had.get(i - hadFrom) : null;
       // A cycle starts from what layout gave its element, which placing it again would lose.
       if (row != null && !anew.test(i) && !row.hasCycle()) {
+        row.parent = this;
         row.kept = true;
         children.add(row);
       } else {
-        children.add(newRow(i));
+        El created = newRow(i);
+        created.parent = this;
+        children.add(created);
       }
     }
     rows.firstRow = from;
@@ -4124,7 +4147,11 @@ public final class El {
    */
   void remakeRow(int index) {
     El row = newRow(rows.firstRow + index);
+    row.parent = this;
     El old = children.set(index, row);
+    if (old.parent == this) {
+      old.parent = null;
+    }
     row.shiftX = old.shiftX;
     row.shiftY = old.shiftY;
   }
