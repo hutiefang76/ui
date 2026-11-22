@@ -4,6 +4,7 @@ import static com.rethinkj.ui.El.col;
 import static com.rethinkj.ui.editor.CodeEditor.codeEditor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.rethinkj.ui.App;
@@ -146,7 +147,7 @@ class CodeEditorMarkupTest {
     String initial = Files.readString(out.resolve("initial.tree.txt"));
     assertTrue(initial.contains("squiggle " + orders + "-" + (orders + 6)), initial);
     assertTrue(initial.contains("error=\"Unknown table\""), initial);
-    assertTrue(initial.contains("el #marker role=img label=\"Run statement\""), initial);
+    assertTrue(initial.contains("el #marker-1 role=img label=\"Run statement\""), initial);
 
     // 2. Insert a line above: diagnostic and marker both move down by the inserted length.
     String prefix = "-- header\n";
@@ -157,7 +158,8 @@ class CodeEditorMarkupTest {
     int shiftedOrders = orders + prefix.length();
     assertTrue(shifted.contains("squiggle " + shiftedOrders + "-" + (shiftedOrders + 6)), shifted);
     assertTrue(
-        shifted.matches("(?s).*#line-1 [^\n]*\n\\s+el #marker role=img label=\"Run statement\".*"),
+        shifted.matches(
+            "(?s).*#line-1 [^\n]*\n\\s+el [^\n]*\n\\s+el #marker-1 role=img label=\"Run statement\".*"),
         shifted);
 
     // 3. Edit the diagnostic's own characters: diagnostic is dropped, other layer's marker stays.
@@ -167,7 +169,7 @@ class CodeEditorMarkupTest {
     String touched = Files.readString(out.resolve("touched.tree.txt"));
     assertFalse(touched.contains("squiggle"), touched);
     assertFalse(touched.contains("error="), touched);
-    assertTrue(touched.contains("el #marker role=img label=\"Run statement\""), touched);
+    assertTrue(touched.contains("el #marker-1 role=img label=\"Run statement\""), touched);
 
     // 4. Back to text A (as after undo): the diagnostic comes back at its original range.
     doc.text = new String(textA);
@@ -175,7 +177,7 @@ class CodeEditorMarkupTest {
     Script.run("size 480 240 scale 2\nframe\nsnap restored", app, out);
     String restored = Files.readString(out.resolve("restored.tree.txt"));
     assertTrue(restored.contains("squiggle " + orders + "-" + (orders + 6)), restored);
-    assertTrue(restored.contains("el #marker role=img label=\"Run statement\""), restored);
+    assertTrue(restored.contains("el #marker-1 role=img label=\"Run statement\""), restored);
 
     // 5. Clearing one layer leaves the other intact.
     doc.editor.noMarkup("analysis");
@@ -183,7 +185,7 @@ class CodeEditorMarkupTest {
     Script.run("size 480 240 scale 2\nframe\nsnap cleared", app, out);
     String cleared = Files.readString(out.resolve("cleared.tree.txt"));
     assertFalse(cleared.contains("squiggle"), cleared);
-    assertTrue(cleared.contains("el #marker role=img label=\"Run statement\""), cleared);
+    assertTrue(cleared.contains("el #marker-1 role=img label=\"Run statement\""), cleared);
 
     // 6. Positions are in the string as the editor shows it, a carriage return and line feed one.
     doc.editor.markup(
@@ -195,5 +197,81 @@ class CodeEditorMarkupTest {
     Script.run("size 480 240 scale 2\nframe\nsnap crlf", app, out);
     String crlf = Files.readString(out.resolve("crlf.tree.txt"));
     assertTrue(crlf.contains("squiggle 2-5"), crlf);
+  }
+
+  @Test
+  void gutterShowsMultipleMarkersPerLineAndMovesChangeBarsWithEdits() throws IOException {
+    TextLibraries.assumeLoaded();
+    String text = "SELECT id\nFROM orders\nWHERE status = 'paid';";
+    Doc doc = new Doc(text);
+    int fromStart = text.indexOf("FROM");
+    int fromEnd = text.indexOf("\nWHERE");
+    int whereStart = fromEnd + 1;
+    doc.editor.diagnostics(
+        text, List.of(new CodeEditor.Diagnostic(0, 6, CodeEditor.Severity.ERROR, "Syntax error")));
+    doc.editor.markup(
+        "app",
+        text,
+        List.of(new CodeEditor.Marker(0, Symbol.PLAY, Icon.Variant.ACCENT, "Run statement", null)));
+    doc.editor.markers(
+        List.of(new CodeEditor.Marker(0, Symbol.RECORD, Icon.Variant.DANGER, "Breakpoint", null)));
+    doc.editor.markup(
+        "vcs",
+        text,
+        List.of(
+            new CodeEditor.Change(fromStart, fromEnd, CodeEditor.Change.Kind.MODIFIED),
+            new CodeEditor.Change(whereStart, whereStart, CodeEditor.Change.Kind.DELETED)));
+
+    App<Doc> app = new App<>(
+        doc,
+        state -> col()
+            .wFull()
+            .hFull()
+            .padding(12)
+            .child(
+                codeEditor(state.app, state.text, state.editor, null, value -> state.text = value)
+                    .key("code")
+                    .lines(6)
+                    .wFull()));
+    doc.app = app;
+    app.textRendering(TextRendering.LINUX);
+
+    // Diagnostic plus two app markers (layer first, then State.markers) all show on line 0, and
+    // the modified/deleted change bars show on lines 1 and 2.
+    Script.run("size 480 240 scale 2\nframe\nsnap before", app, out);
+    String before = Files.readString(out.resolve("before.tree.txt"));
+    String first = cell(before, 0);
+    int error = first.indexOf("el #marker role=img label=\"Error\"");
+    int run = first.indexOf("el #marker-1 role=img label=\"Run statement\"");
+    int breakpoint = first.indexOf("el #marker-2 role=img label=\"Breakpoint\"");
+    assertTrue(error >= 0 && run > error && breakpoint > run, first);
+    assertEquals("2x16", change(before, 1), before);
+    assertEquals("2x4", change(before, 2), before);
+
+    // Insert a line before: both Change bars move down by one line.
+    doc.text = "-- header\n" + text;
+    app.invalidate();
+    Script.run("size 480 240 scale 2\nframe\nsnap after", app, out);
+    String after = Files.readString(out.resolve("after.tree.txt"));
+    assertNull(change(after, 1), after);
+    assertEquals("2x16", change(after, 2), after);
+    assertEquals("2x4", change(after, 3), after);
+  }
+
+  /** The tree dump of the gutter cell of line {@code index}. */
+  private static String cell(String tree, int index) {
+    int from = tree.indexOf("#line-" + index + " ");
+    int to = tree.indexOf("#line-" + (index + 1) + " ", from);
+    return from < 0 ? "" : tree.substring(from, to < 0 ? tree.length() : to);
+  }
+
+  /** The size of the change bar in the cell of line {@code index}, or null without one. */
+  private static String change(String tree, int index) {
+    return cell(tree, index)
+        .lines()
+        .filter(line -> line.contains("el #change "))
+        .map(line -> line.substring(line.lastIndexOf(' ') + 1))
+        .findFirst()
+        .orElse(null);
   }
 }
