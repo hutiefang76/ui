@@ -3,11 +3,13 @@ package com.rethinkj.ui;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -46,9 +48,13 @@ final class Focus {
   // the focus moves, it goes to the default focus that appears there later, and the place it holds
   // meanwhile does not count in recent.
   private Object awaiting;
-  // The overlays of the last tree the view built, in the order they opened, with where the focus
-  // was before each took it; null for one that took none.
+  // The overlays of the last tree, in the order they opened, with where the focus was before each
+  // took it; null for one that took none. Those inside virtual-list rows and field parts are also
+  // in partOverlays, so openAndClose(tree) leaves them to openAndCloseParts(root) after layout.
   private final Map<Object, Place> opened = new LinkedHashMap<>();
+  private final Set<Object> partOverlays = new HashSet<>();
+  // The open modal overlays that took the focus without an element to give it to.
+  private final Set<Object> nowhere = new HashSet<>();
   // For the open overlays that took no focus, such as a toast: where the focus was last outside
   // each, for when the keyboard moved it inside and the overlay closes.
   private final Map<Object, Place> outside = new HashMap<>();
@@ -394,17 +400,49 @@ final class Focus {
    * #refocus} finds the element after layout.
    */
   void openAndClose(El tree, double time) {
+    if (!openAndClose(Animator.overlays(tree), false, time)) {
+      ask(animator.autofocus(tree), time);
+    }
+  }
+
+  /**
+   * Like {@link #openAndClose}, once the rows of virtual lists and the post-layout parts of
+   * multi-line fields are built: closes and opens the overlays inside them.
+   */
+  void openAndCloseParts(El root, double time) {
+    openAndClose(Animator.partOverlays(root), true, time);
+  }
+
+  private boolean openAndClose(Map<Object, El> now, boolean parts, double time) {
     boolean took = false;
-    Map<Object, El> now = Animator.overlays(tree);
+    nowhere.removeIf(overlay -> now.containsKey(overlay) && !now.get(overlay).isModal());
     List<Object> before = new ArrayList<>(opened.keySet());
     for (Object overlay : before.reversed()) {
-      if (now.containsKey(overlay)) {
+      if (partOverlays.contains(overlay) != parts || now.containsKey(overlay)) {
         continue;
       }
+      partOverlays.remove(overlay);
+      nowhere.remove(overlay);
       Place back = opened.remove(overlay);
       Place left = outside.remove(overlay);
-      boolean inside = id != null && (id.equals(overlay) || Animator.isBelow(id, overlay));
-      if (back != null && (id == null || inside)) {
+      boolean inside = id != null && within(id, overlay);
+      // Overlays opened from inside it, such as a dialog from a menu, now give the focus back to
+      // where this one would have; while a modal one of them holds it nowhere, it stays so.
+      Place giveBack = back != null ? back : left;
+      boolean handedOn = false;
+      for (Map<Object, Place> places : List.of(opened, outside)) {
+        for (Map.Entry<Object, Place> other : places.entrySet()) {
+          Place place = other.getValue();
+          if (giveBack != null
+              && place != null
+              && within(place.id(), overlay)
+              && !within(giveBack.id(), other.getKey())) {
+            other.setValue(giveBack);
+            handedOn |= places == opened && nowhere.contains(other.getKey());
+          }
+        }
+      }
+      if (back != null && (id == null && !handedOn || inside)) {
         move(back.id(), back.ring(), time);
       } else if (left != null && inside) {
         move(left.id(), left.ring(), time);
@@ -419,25 +457,31 @@ final class Focus {
           && !Animator.isBelow(id, overlayId)) {
         outside.put(overlayId, new Place(id, ring));
       }
-      if (opened.containsKey(overlay.getKey())) {
+      if (opened.containsKey(overlayId)) {
         continue;
       }
-      Object first = Animator.firstFocusable(overlay.getValue(), overlay.getKey());
       El el = overlay.getValue();
+      Object first = Animator.firstFocusable(el, overlayId);
       boolean takes =
           (el.holdsFocus() || !el.keepsFocus()) && (first != null || el.isModal() && !el.isInert());
-      opened.put(overlay.getKey(), takes ? new Place(id, ring) : null);
+      opened.put(overlayId, takes ? new Place(id, ring) : null);
+      if (parts) {
+        partOverlays.add(overlayId);
+      }
       if (!takes && id != null) {
-        outside.put(overlay.getKey(), new Place(id, ring));
+        outside.put(overlayId, new Place(id, ring));
+      }
+      if (takes && first == null) {
+        nowhere.add(overlayId);
       }
       if (takes) {
+        beforeAsked = null;
+        askedNext = List.of();
         move(first, false, time);
         took = true;
       }
     }
-    if (!took) {
-      ask(animator.autofocus(tree), time);
-    }
+    return took;
   }
 
   /**
@@ -461,6 +505,11 @@ final class Focus {
       move(asked.getFirst(), ring, time);
       reveal = true;
     }
+  }
+
+  /** Whether the element with identity {@code id} is {@code overlay} or inside it. */
+  private static boolean within(Object id, Object overlay) {
+    return overlay.equals(id) || Animator.isBelow(id, overlay);
   }
 
   /**
