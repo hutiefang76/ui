@@ -14,6 +14,7 @@ import com.rethinkj.ui.Len;
 import com.rethinkj.ui.Style;
 import com.rethinkj.ui.window.Windows;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -89,7 +90,9 @@ import java.util.function.IntConsumer;
  * role=tab} with the title as label and the key {@code tab-<index>}, a busy one {@code busy}, a
  * modified one {@code modified}, their crosses {@code role=button} with the label {@code Close}
  * and the title and the key {@code close-<index>}, the button of {@link Options#onAdd} {@code
- * #add} with {@code role=button} and the label {@code New tab}, and the content is in {@code
+ * #add} with {@code role=button} and the label {@code New tab}, the button of {@link
+ * Options#overflow} {@code #overflow} with {@code role=button} and the label {@code All tabs}
+ * while the tabs overflow and its empty room {@code #room} otherwise, and the content is in {@code
  * #panel} with {@code role=tabpanel} and the active tab's title as label. The tab being dragged is
  * {@code grabbed}, and the line where it would go is {@code #marker}.
  * The component needs a size of its own or room to grow; its content fills the rest of it. It
@@ -287,14 +290,74 @@ public final class Tabs {
   }
 
   /**
-   * What the tabs do besides choosing and closing: adding, moving, tearing off, docking and a menu,
-   * and how they look. Each is off until a call turns it on; the view makes the options anew with
-   * the tabs.
+   * What the app keeps of a tab bar's overflow menu ({@link Options#overflow}): the menu state and
+   * the widths layout gave the bar and its tabs. The tabs change it; the app only creates it and
+   * keeps one per bar.
+   */
+  public static final class Overflow {
+    final Menu.State menu = new Menu.State();
+    float barWidth = Float.NaN;
+    float addWidth = Float.NaN;
+    float[] tabWidths = new float[0];
+    Object revealKey;
+    float revealX;
+    float revealWidth;
+
+    /** The menu of all tabs. */
+    public Menu.State menu() {
+      return menu;
+    }
+
+    /** Grows only: a tab that comes back at an index tells no size again if its size is kept. */
+    void resize(int count) {
+      if (tabWidths.length < count) {
+        int prev = tabWidths.length;
+        tabWidths = Arrays.copyOf(tabWidths, count);
+        Arrays.fill(tabWidths, prev, count, Float.NaN);
+      }
+    }
+
+    void tabWidth(int index, float width) {
+      if (index < tabWidths.length) {
+        tabWidths[index] = width;
+      }
+    }
+
+    boolean overflows(int count, float available, float gap) {
+      if (count == 0 || Float.isNaN(barWidth) || Float.isNaN(available)) {
+        return false;
+      }
+      float total = -gap;
+      boolean any = false;
+      for (int i = 0; i < count; i++) {
+        float w = tabWidths[i];
+        if (Float.isNaN(w)) {
+          return any && total > available;
+        }
+        total += gap + w;
+        any = true;
+      }
+      return total > available;
+    }
+
+    /** Scrolls the list to show this tab of the view the user chose it in, once. */
+    void reveal(El tab, El list) {
+      revealKey = new Object();
+      revealX = tab.x() + (float) list.scrollX();
+      revealWidth = tab.width();
+    }
+  }
+
+  /**
+   * What the tabs do besides choosing and closing: adding, an overflow menu, moving, tearing off,
+   * docking and a context menu, and how they look. Each is off until a call turns it on; the view
+   * makes the options anew with the tabs.
    */
   public static final class Options {
     private Dragging dragging;
     private Object id;
     private Runnable onAdd;
+    private Overflow overflow;
     private Move onMove;
     private Consumer<TearOff> onTearOff;
     private boolean tearOffAtStart;
@@ -319,6 +382,17 @@ public final class Tabs {
      */
     public Options onAdd(Runnable handler) {
       this.onAdd = handler;
+      return this;
+    }
+
+    /**
+     * Shows a button at the bar's end, after any {@link #onAdd} button, while the tabs do not
+     * fit. It opens a dropdown that lists every tab in bar order; choosing a tab selects it and
+     * scrolls it into view, also when it is already active. The app keeps one {@link Overflow}
+     * state per bar.
+     */
+    public Options overflow(Overflow state) {
+      this.overflow = Objects.requireNonNull(state, "state");
       return this;
     }
 
@@ -581,6 +655,13 @@ public final class Tabs {
     Theme theme = Theme.CURRENT.get();
     boolean enabled = onSelect != null;
     Dragging dragging = options.dragging;
+    Overflow overflow = options.overflow;
+    if (overflow != null) {
+      overflow.resize(tabs.size());
+      if (!enabled) {
+        overflow.menu.close();
+      }
+    }
     boolean drags =
         enabled && dragging != null && (options.onMove != null || options.onTearOff != null);
     // Each input reaches the handlers of a view built after the one before it, so this view's
@@ -668,22 +749,31 @@ public final class Tabs {
           options.menu.openAt(x, y);
         });
       }
+      if (enabled && overflow != null) {
+        int index = i;
+        tab.onResize((w, h) -> overflow.tabWidth(index, w));
+      }
       built.add(tab);
       list.child(tab);
     }
+    float padX = line ? theme.space().s() : theme.space().xs();
+    float gap = theme.space().xs();
     El bar = row()
         .key("bar")
         .fill(line ? 0 : theme.surface().band())
-        .padding(0, line ? theme.space().s() : theme.space().xs())
-        .gap(theme.space().xs())
+        .padding(0, padX)
+        .gap(gap)
         .align(Style.Align.CENTER)
         .shrink(0)
         .border(0, 0, theme.size().stroke(), 0, theme.border().divider())
         .child(list);
+    if (enabled && overflow != null) {
+      bar.onResize((w, h) -> overflow.barWidth = w);
+    }
     if (enabled && options.onAdd != null) {
       // In a row without motion of its own, so that the button's spring leaves its place alone
       // and it follows the bar at once when the tabs or the width change.
-      bar.child(row()
+      El add = row()
           .shrink(0)
           .child(Button.icon(
                   Button.Variant.GHOST,
@@ -693,7 +783,54 @@ public final class Tabs {
                   Button.options()
                       .size(line ? Button.Size.SMALL : Button.Size.REGULAR)
                       .shortcut(Key.CONTROL, "T"))
-              .key("add")));
+              .key("add"));
+      if (overflow != null) {
+        add.onResize((w, h) -> overflow.addWidth = w);
+      }
+      bar.child(add);
+    }
+    if (enabled && overflow != null) {
+      // While the tabs fit, an empty room as wide as the button and its gap stands in their place
+      // and gives way first, so that the bar asks for the same width with the button and without.
+      float side = line ? theme.size().controlSmall() : theme.size().control();
+      float available = overflow.barWidth - 2 * padX;
+      if (options.onAdd != null) {
+        available -= overflow.addWidth + gap;
+      }
+      if (overflow.overflows(tabs.size(), available, gap)) {
+        List<Menu.Item> items = new ArrayList<>(tabs.size());
+        for (int i = 0; i < tabs.size(); i++) {
+          int index = i;
+          items.add(Menu.item(tabs.get(i).title(), () -> {
+                if (index == active) { // another tab comes into view as the active one
+                  overflow.reveal(built.get(index), list);
+                }
+                select.accept(index);
+              })
+              .icon(tabs.get(i).icon())
+              .checked(i == active));
+        }
+        El button = Button.icon(
+                Button.Variant.GHOST,
+                Symbol.CHEVRON_DOWN,
+                Texts.CURRENT.get().allTabs(),
+                overflow.menu::toggle,
+                Button.options().size(line ? Button.Size.SMALL : Button.Size.REGULAR))
+            .key("overflow")
+            .expanded(overflow.menu.isOpen());
+        bar.child(row().shrink(0).child(Menu.dropdown(button, overflow.menu, items)));
+      } else {
+        overflow.menu.close();
+        list.shrink(0);
+        El room = el().key("room").w(side + gap);
+        room.style().minWidth = Len.ZERO;
+        room.style().marginLeft = Len.px(-gap); // the bar's gap before it is part of its width
+        bar.child(room);
+      }
+      if (overflow.revealKey != null) {
+        list.reveal(overflow.revealKey, overflow.revealX, 0, overflow.revealWidth, height);
+        overflow.revealKey = null; // once: a later build must not bring the old choice back
+      }
     }
     if (enabled && dragging != null) {
       bar.onDrop(d -> over(theme, options, list, built, d));
