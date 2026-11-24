@@ -363,6 +363,7 @@ public final class Tabs {
     private Move onMove;
     private Consumer<TearOff> onTearOff;
     private boolean tearOffAtStart;
+    private boolean tearOffOutside;
     private boolean switchKeys = true;
     private boolean active = true;
     private Object focusBar;
@@ -444,6 +445,19 @@ public final class Tabs {
      */
     public Options tearOffAtStart(boolean on) {
       this.tearOffAtStart = on;
+      return this;
+    }
+
+    /**
+     * Whether a drag tears its tab off only once the pointer leaves every window of the app
+     * ({@link Drag#outsideAll}) instead of on leaving the bar by more than {@link
+     * Theme.Sizes#control}; false by default. With this on, dragging over the content of the
+     * window stays inside, as for the drop zones of {@link TabGroups#splits}, and without a window
+     * runner a drag never tears off. On Wayland, where the pointer is not reported outside a
+     * window, a tab's menu is the way to move it to a new window.
+     */
+    public Options tearOffOutside(boolean on) {
+      this.tearOffOutside = on;
       return this;
     }
 
@@ -544,7 +558,8 @@ public final class Tabs {
       g.firstY = d.windowY() - (float) d.y();
       g.window = d.window();
       g.torn = o.onTearOff != null && o.tearOffAtStart;
-      if (!g.torn && o.onMove != null) { // the bar's drop handler ran before this step
+      // The bar's drop handler ran before this step, if the pointer is still over the bar.
+      if (!g.torn && o.onMove != null && d.y() >= 0 && d.y() < height(theme, o)) {
         mark(theme, o, list, built, built.get(index).x() + (float) d.x());
       }
     }
@@ -558,10 +573,10 @@ public final class Tabs {
     g.steps++;
     boolean moving = phase == Drag.Phase.START || phase == Drag.Phase.MOVE;
     float reach = theme.size().control();
-    if (moving
-        && !g.torn
-        && o.onTearOff != null
-        && (d.outside() || d.y() < -reach || d.y() > height(theme, o) + reach)) {
+    boolean leave = o.tearOffOutside
+        ? d.outsideAll()
+        : d.outside() || d.y() < -reach || d.y() > height(theme, o) + reach;
+    if (moving && !g.torn && o.onTearOff != null && leave) {
       g.torn = true;
     }
     if (g.torn) {
