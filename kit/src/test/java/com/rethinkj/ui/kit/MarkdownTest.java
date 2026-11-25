@@ -11,6 +11,7 @@ import com.rethinkj.ui.App;
 import com.rethinkj.ui.Clipboard;
 import com.rethinkj.ui.El;
 import com.rethinkj.ui.Highlighter;
+import com.rethinkj.ui.RowHeights;
 import com.rethinkj.ui.Script;
 import com.rethinkj.ui.Side;
 import com.rethinkj.ui.Text;
@@ -510,6 +511,40 @@ class MarkdownTest {
         colored);
     assertEquals(commentColor, paragraph(coloredFragment).text().color());
     assertEquals(commentColor, paragraph(coloredDefinitions).text().color());
+  }
+
+  /**
+   * A virtual fragment in a row of a virtual list builds only the blocks in view, and the text of
+   * a selection scope around the list reaches the others.
+   */
+  @Test
+  void aVirtualFragmentBuildsTheBlocksInViewAndReachesTheRest() throws IOException {
+    StringBuilder source = new StringBuilder();
+    for (int i = 0; i < 300; i++) {
+      source.append("Paragraph ").append(i).append(" of the answer.\n\n");
+    }
+    MarkdownDocument document = Markdown.parse(source.toString());
+    RowHeights heights = new RowHeights(i -> 100);
+    App<Object> app = new App<>(
+        new Object(),
+        state -> col()
+            .wFull()
+            .hFull()
+            .child(col()
+                .key("scope")
+                .selectionScope()
+                .grow(1)
+                .minSize(0, 0)
+                .rows(
+                    1,
+                    heights,
+                    i -> Markdown.fragment(document, Markdown.options().virtual()))));
+    String tree = run(app, "frame");
+    long built = tree.lines().filter(l -> l.contains("role=paragraph")).count();
+    assertTrue(built > 0 && built < 60, "built " + built + " of 300 blocks");
+    String all = app.scopeText(CellEditorTest.find(app.tree(), "scope"));
+    assertTrue(all.startsWith("Paragraph 0 of the answer.\nParagraph 1 "), all);
+    assertTrue(all.endsWith("Paragraph 299 of the answer."), all);
   }
 
   @Test
