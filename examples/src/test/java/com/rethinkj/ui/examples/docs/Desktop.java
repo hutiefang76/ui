@@ -11,6 +11,7 @@ import com.rethinkj.ui.render.GpuPresenter;
 import com.rethinkj.ui.window.Window;
 import com.rethinkj.ui.window.WindowIcon;
 import com.rethinkj.ui.window.WindowLoop;
+import com.rethinkj.ui.window.Windows;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -140,7 +141,7 @@ final class Desktop {
         Tray.of(
             icon,
             "Lights",
-            Tray.button("Show window", () -> raiseMain(app)),
+            Tray.button("Show window", () -> showMain(app)),
             Tray.checkbox("Lights on", app.state().on, checked -> setLights(app, icon, checked)),
             Tray.separator(),
             Tray.submenu(
@@ -150,10 +151,12 @@ final class Desktop {
             Tray.separator(),
             Tray.button("Quit", () -> closeAll(app))),
         error -> noTray(app, error));
+    Windows.Handle window = app.windows().of(app);
+    window.onCloseRequest(window::hide); // closing hides the window to the tray
   }
 
-  static void raiseMain(App<Lights> app) {
-    app.windows().of(app).raise();
+  static void showMain(App<Lights> app) {
+    app.windows().of(app).show();
   }
 
   static void setLights(App<Lights> app, WindowIcon icon, boolean on) {
@@ -166,6 +169,7 @@ final class Desktop {
   }
 
   static void noTray(App<Lights> app, String error) {
+    app.windows().of(app).onCloseRequest(null); // without a tray, closing closes the window
     app.messageBox(MessageBox.error("No system tray", error), button -> {}, ignored -> {});
   }
   // docs:end tray

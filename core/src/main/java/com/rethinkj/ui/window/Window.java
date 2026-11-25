@@ -1746,6 +1746,11 @@ public final class Window implements AutoCloseable {
     return (Sdl.getWindowFlags(sdl) & Sdl.WINDOW_MINIMIZED) != 0;
   }
 
+  public boolean isHidden() {
+    checkOpen();
+    return (Sdl.getWindowFlags(sdl) & Sdl.WINDOW_HIDDEN) != 0;
+  }
+
   public boolean isFocused() {
     checkOpen();
     return (Sdl.getWindowFlags(sdl) & Sdl.WINDOW_INPUT_FOCUS) != 0;
@@ -1768,6 +1773,31 @@ public final class Window implements AutoCloseable {
     checkOpen();
     Sdl.restoreWindow(sdl);
     rethrow();
+  }
+
+  /**
+   * Hides the window: it disappears from the screen and the taskbar while staying open. Does
+   * nothing if the window is already hidden.
+   */
+  public void hide() {
+    checkOpen();
+    if (!isHidden()) {
+      Sdl.hideWindow(sdl);
+      rethrow();
+    }
+  }
+
+  /**
+   * Shows a hidden window again and {@link #raise raises} it, also when it was not hidden, as a
+   * tray's entry that shows the window wants.
+   */
+  public void show() {
+    checkOpen();
+    if (isHidden()) {
+      Sdl.showWindow(sdl);
+      rethrow();
+    }
+    raise();
   }
 
   /**

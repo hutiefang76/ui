@@ -2184,9 +2184,9 @@ public final class App<S> {
 
   /**
    * Shows a desktop notification of the system with {@code title} and {@code body}. When the user
-   * clicks it while the app runs, the app asks for its window to come to the front, which a
-   * Wayland compositor may refuse, and {@code onClick} runs as a {@link #post posted} task: on the
-   * app's thread, with a frame after it. If the system cannot show the notification, {@code
+   * clicks it while the app runs, the app shows its window, if hidden, and asks for it to come to
+   * the front, which a Wayland compositor may refuse, and {@code onClick} runs as a {@link #post
+   * posted} task: on the app's thread, with a frame after it. If the system cannot show the notification, {@code
    * onError} gets what went wrong as a posted task instead. Call it on the app's thread, usually in
    * a handler; it does not wait for the system, as a window's runner hands the notification
    * over on a thread of its own. Set the app's name and icon beforehand with {@link
@@ -2212,7 +2212,7 @@ public final class App<S> {
             post(() -> {
               Windows.Handle handle = windows.of(this);
               if (handle != null) {
-                handle.raise();
+                handle.show(); // also a window hidden to the tray
               }
               onClick.run();
             });
@@ -2433,6 +2433,16 @@ public final class App<S> {
       return next;
     }
     return Math.min(next, blinkStart + (Math.floor((time - blinkStart) / BLINK) + 1) * BLINK);
+  }
+
+  /**
+   * The time on the app's clock at which it has work to run without input: now while handlers
+   * wait, else when the next action of {@link #after} is due; positive infinity when none is.
+   * Unlike {@link #nextChange} it leaves out what only shows, such as a caret's blink or an {@link
+   * El#cycle}, for a runner whose window is hidden.
+   */
+  public double nextAction() {
+    return handlersWaiting() ? time : scheduler.nextDue();
   }
 
   /**
