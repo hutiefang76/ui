@@ -483,6 +483,7 @@ public final class El {
     float clipRight = Float.POSITIVE_INFINITY;
     float clipBottom = Float.POSITIVE_INFINITY;
     float coverBottom = Float.NEGATIVE_INFINITY;
+    float laidTotal = Float.NaN; // the height of the rows when layout last measured the list
   }
 
   /** The state of a text field, which {@link #editable} makes, beyond its {@link Text}. */
@@ -1440,8 +1441,10 @@ public final class El {
     // add up to the pixel: 22 000 000 pixels of rows and 23 above them came to 22 000 024, and a
     // list that shrank into 224 pixels was 200 high instead of 201. The offsets of scrolling are
     // doubles and reach the last row anyway.
-    this.measure = (knownWidth, knownHeight, availableWidth, availableHeight) ->
-        new Measure.Size(0, (float) Math.min(rowsTotal(), LAYOUT_LIMIT));
+    this.measure = (knownWidth, knownHeight, availableWidth, availableHeight) -> {
+      list.laidTotal = laidRowsTotal();
+      return new Measure.Size(0, list.laidTotal);
+    };
     return this;
   }
 
@@ -5360,9 +5363,18 @@ public final class El {
     }
     if (rows != null) {
       maxScrollX = 0;
-      maxScrollY = Math.max(
-          rowsTop() + rowsTotal() + padding(Side.BOTTOM) + border(Side.BOTTOM) + coverY - height,
-          0);
+      double content = rowsTop() + rowsTotal() + padding(Side.BOTTOM) + border(Side.BOTTOM);
+      double over = content + coverY - height;
+      // A list as high as its rows does not scroll by what layout rounded off its edges.
+      double rounded = content - height;
+      boolean asHigh = Len.AUTO.equals(style.height)
+          && Len.AUTO.equals(style.maxHeight)
+          && style.grow == 0
+          && rows.laidTotal == laidRowsTotal();
+      if (asHigh && rounded > 0 && rounded < 1) {
+        over -= rounded;
+      }
+      maxScrollY = Math.max(over, 0);
       return;
     }
     boolean scrolls =
@@ -5917,12 +5929,33 @@ public final class El {
       float windowWidth,
       float windowHeight,
       boolean anew) {
+    float far = Float.POSITIVE_INFINITY;
+    return wantedRows(left, top, clipLeft, clipRight, -far, far, windowWidth, windowHeight, anew);
+  }
+
+  /**
+   * Like {@link #wantedRows(float, float, float, float, float, float, boolean)}, with the vertical
+   * clip of the list's ancestors too, from {@code clipTop} to {@code clipBottom} in window
+   * coordinates: a list as high as its rows in a row of another list builds the rows in view of
+   * that one.
+   */
+  int[] wantedRows(
+      float left,
+      float top,
+      float clipLeft,
+      float clipRight,
+      float clipTop,
+      float clipBottom,
+      float windowWidth,
+      float windowHeight,
+      boolean anew) {
     if (rows == null) {
       return NO_ROWS;
     }
     double row0 = top + rowsTop() - scrollY; // where row 0 is in the window
-    double from = Math.max(top, 0);
-    double to = Math.max(Math.min(top + height, windowHeight), from);
+    double from = Math.max(Math.max(top, clipTop), 0);
+    double bottom = Math.min(Math.min(top + height, clipBottom), windowHeight);
+    double to = Math.max(bottom, from); // none, where the list is out of view
     int first = Math.clamp(rowAt(from - row0), 0, rows.rowCount);
     int end = Math.clamp(rowAfter(to - row0), first, rows.rowCount);
     float shown = 0;
@@ -6184,6 +6217,39 @@ public final class El {
   /** Whether this is a virtual list whose rows are as high as their content. */
   boolean measuresRows() {
     return rows.heights != null;
+  }
+
+  /**
+   * Whether this virtual list's rows came to another height than layout measured it at, as rows
+   * built and measured since make them: a list as high as its rows, in a row of another list, has
+   * that row laid out again, and then {@link #rowsSettled}.
+   */
+  boolean rowsRegrown() {
+    return rows != null
+        && rows.heights != null
+        && !Float.isNaN(rows.laidTotal)
+        && laidRowsTotal() != rows.laidTotal;
+  }
+
+  /**
+   * Takes the height of the rows as measured, also where layout did not ask, as for a list of a
+   * height of its own.
+   */
+  void rowsSettled() {
+    rows.laidTotal = laidRowsTotal();
+  }
+
+  /**
+   * Measures how far the areas in this list's rows scroll after the row with this index was laid
+   * out again, and keeps the offsets of that row's areas within it.
+   */
+  void remeasureRow(int index) {
+    measureRowScrolls();
+    children.get(index).clampScrolls();
+  }
+
+  private float laidRowsTotal() {
+    return (float) Math.min(rowsTotal(), LAYOUT_LIMIT);
   }
 
   /** The left of the rows, the left of the content box. */
