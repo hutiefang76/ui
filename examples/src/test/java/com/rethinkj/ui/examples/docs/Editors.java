@@ -34,6 +34,7 @@ import com.rethinkj.ui.kit.Texts;
 import com.rethinkj.ui.kit.Theme;
 import com.rethinkj.ui.render.Pixels;
 import com.rethinkj.ui.sql.Sql;
+import com.rethinkj.ui.text.Font;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -1145,6 +1146,42 @@ final class Editors {
     };
   }
   // docs:end markdown-languages
+
+  // docs:start prose-fonts
+  // The app's theme and the reading theme derived from it, derived again only when the app's
+  // theme changes, since Markdown keeps what it measured for the theme it was built with
+  Theme base;
+  Theme reading;
+
+  // Larger text and code for the answers
+  static Theme readingTheme(Theme theme) {
+    Theme.Prose prose = theme.prose();
+    return theme.withProse(new Theme.Prose(
+        new Theme.TextStyle(Font::sans, 15),
+        prose.headings(),
+        prose.emphasis(),
+        prose.strong(),
+        prose.strongEmphasis(),
+        prose.headingStrong(),
+        prose.tableHeader(),
+        new Theme.TextStyle(Font::mono, 13),
+        prose.monoStrong(),
+        prose.link(),
+        prose.code(),
+        prose.quote(),
+        prose.measure()));
+  }
+
+  static El answer(Editors state) {
+    Theme theme = Theme.CURRENT.get();
+    if (theme != state.base) {
+      state.base = theme;
+      state.reading = readingTheme(theme);
+    }
+    return Theme.CURRENT.with(
+        state.reading, () -> Markdown.fragment(state.summary, Markdown.options()));
+  }
+  // docs:end prose-fonts
 
   static El image(Editors state) {
     // docs:start image
