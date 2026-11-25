@@ -5,6 +5,7 @@ import static com.rethinkj.ui.El.el;
 import static com.rethinkj.ui.El.row;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -703,6 +704,101 @@ class FieldDragTest {
     app.keyDown(new Key("C", Key.CONTROL, false));
     app.frame();
     assertEquals(expected, app.clipboard().read(), "Ctrl+C copies the same fields after insert");
+  }
+
+  @Test
+  void scopeTextSelectAndDecorateSpanFieldsAndVirtualRows() {
+    int[] mark = {0, 0};
+    App<Object> app = new App<>(
+        new Object(),
+        state -> col()
+            .wFull()
+            .hFull()
+            .child(col()
+                .key("scope")
+                .selectionScope()
+                .grow(1)
+                .minSize(0, 0)
+                .decorate((line, start, text, out) -> {
+                  int end = start + text.length();
+                  if (mark[1] > start && mark[0] < end) {
+                    int a = Math.max(mark[0], start) - start;
+                    int b = Math.min(mark[1], end) - start;
+                    out.background(a, b, 0x44FFCC00);
+                    out.underline(a, b, 0xFFFFCC00);
+                  }
+                })
+                .child(El.text("lead")
+                    .editable(v -> {})
+                    .readOnly()
+                    .key("lead")
+                    .w(180)
+                    .h(24))
+                .child(El.text("hidden")
+                    .editable(v -> {})
+                    .readOnly()
+                    .masked()
+                    .w(180)
+                    .h(24))
+                .child(col().key("list").grow(1).minSize(0, 0).rows(30, 30, i -> {
+                  El field = El.text("row " + i + " item")
+                      .editable(v -> {})
+                      .readOnly()
+                      .multiline()
+                      .fitLines()
+                      .key("r" + i)
+                      .w(180);
+                  if (i == 0) {
+                    field.decorate((line, start, text, out) -> out.background(0, 3, 0x2200FF00));
+                  }
+                  return field;
+                }))
+                .child(El.text("tail")
+                    .editable(v -> {})
+                    .readOnly()
+                    .key("tail")
+                    .w(180)
+                    .h(24))));
+    app.textRendering(TextRendering.LINUX);
+    app.resize(220, 160, 2);
+    app.frame();
+
+    El scope = byKey(app.tree(), "scope");
+    String all = app.scopeText(scope);
+    assertTrue(all.startsWith("lead\nrow 0 item\n"), all);
+    assertFalse(all.contains("hidden"), "masked fields are excluded");
+    assertTrue(all.endsWith("\nrow 29 item\ntail"), all);
+
+    // Decorate a range in row 0: merged with row 0's own decorator.
+    int row0Start = all.indexOf("row 0 item");
+    mark[0] = row0Start + 6; // "item"
+    mark[1] = row0Start + 10;
+    app.invalidate();
+    app.frame();
+    El r0 = byKey(app.tree(), "r0");
+    assertTrue(r0.text().marks().size() >= 3, "own background plus scope background and underline");
+    assertEquals(2, r0.text().underlined().length);
+    assertEquals(6, r0.text().underlined()[0]);
+    assertEquals(10, r0.text().underlined()[1]);
+
+    // Select a match in an out-of-view row: scrolls it into view, decorates it, and Ctrl+C copies.
+    int row25Start = all.indexOf("row 25 item");
+    assertEquals(null, byKey(app.tree(), "r25"), "row 25 is not built yet");
+    mark[0] = row25Start + 4;
+    mark[1] = row25Start + 11; // "25 item"
+    app.select(byKey(app.tree(), "scope"), mark[1], mark[0]);
+    app.frame();
+
+    El r25 = byKey(app.tree(), "r25");
+    assertNotNull(r25, "row 25 scrolled into view and built");
+    assertEquals("25 item", r25.editor().selectedText());
+    assertEquals(2, r25.text().underlined().length);
+    assertEquals(4, r25.text().underlined()[0]);
+    assertEquals(11, r25.text().underlined()[1]);
+
+    app.keyDown(new Key("C", Key.CONTROL, false));
+    app.frame();
+    assertEquals("25 item", app.clipboard().read());
   }
 
   @Test
