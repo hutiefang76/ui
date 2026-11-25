@@ -491,6 +491,12 @@ public final class Markdown {
 
   // ---- What is kept with the document
 
+  /** The widest natural and longest-word text widths of a table's columns. */
+  private record TableWidths(float[] natural, float[] min) {}
+
+  /** What table widths were measured for: the scale, and whether cells showed their images. */
+  private record Measured(float scale, boolean images) {}
+
   /** The blocks of text of a document, made once per theme. */
   private static final class Prepared {
     final MarkdownDocument document;
@@ -498,6 +504,8 @@ public final class Markdown {
     final Map<Integer, Map<Object, Piece>> pieces = new HashMap<>();
     // The widths of lists' markers, by the window's scale they were measured at.
     final Map<Float, Map<Object, Float>> columns = new HashMap<>();
+    // The natural and longest-word column widths of tables, by what they were measured for.
+    final Map<Measured, Map<MarkdownDocument.Table, TableWidths>> tables = new HashMap<>();
     final List<Unit> units;
     final RowHeights heights;
     final RowHeights blockHeights; // the rows of a virtual fragment: its blocks
@@ -570,6 +578,15 @@ public final class Markdown {
         }
       }
       case MarkdownDocument.Table table -> {
+        for (var entry : old.tables.entrySet()) {
+          TableWidths widths = entry.getValue().get(table);
+          if (widths != null) {
+            target
+                .tables
+                .computeIfAbsent(entry.getKey(), s -> new IdentityHashMap<>())
+                .put(table, widths);
+          }
+        }
         for (List<Inline> cell : table.header()) {
           copyPiece(cell, old, target);
         }
@@ -736,6 +753,7 @@ public final class Markdown {
   private static final int STRONG = 2;
 
   static int piecesBuilt; // for tests
+  static int tablesMeasured; // for tests
 
   /** Makes the piece of a run of inline parts, once per document, theme and text color. */
   private static Piece piece(Context c, Object owner, List<Inline> content, boolean heading) {
@@ -1389,13 +1407,54 @@ public final class Markdown {
         .fontFeatures("+tnum");
   }
 
+  /**
+   * The natural and widest-word column widths of a table's text, measured once per scale and
+   * whether the view shows images, whose cells it does not measure.
+   */
+  private static TableWidths tableWidths(
+      Context c,
+      MarkdownDocument.Table table,
+      List<List<Piece>> cells,
+      Theme.TextStyle head,
+      Theme.TextStyle body) {
+    return c.prepared
+        .tables
+        .computeIfAbsent(
+            new Measured(WindowState.CURRENT.get().scale(), c.options.images != null),
+            m -> new IdentityHashMap<>())
+        .computeIfAbsent(table, t -> measureTable(cells, table.aligns().size(), head, body));
+  }
+
+  private static TableWidths measureTable(
+      List<List<Piece>> cells, int columns, Theme.TextStyle head, Theme.TextStyle body) {
+    tablesMeasured++;
+    float[] natural = new float[columns];
+    float[] min = new float[columns];
+    for (int r = 0; r < cells.size(); r++) {
+      Theme.TextStyle style = r == 0 ? head : body;
+      for (int j = 0; j < columns; j++) {
+        Piece piece = cells.get(r).get(j);
+        if (piece == null) {
+          continue; // images, measured on each build
+        }
+        El sample = El.text(piece.text)
+            .wrapText()
+            .font(style.font().get())
+            .fontSize(style.size())
+            .highlight(piece, piece);
+        natural[j] = Math.max(natural[j], TextSizing.natural(sample));
+        min[j] = Math.max(min[j], TextSizing.minimum(sample));
+      }
+    }
+    return new TableWidths(natural, min);
+  }
+
   private static El table(Context c, MarkdownDocument.Table table) {
     Theme theme = c.theme;
     Theme.TextStyle body = theme.prose().body();
     Theme.TextStyle head = new Theme.TextStyle(theme.type().strong().font(), body.size());
     int columns = table.aligns().size();
     float pad = theme.space().m();
-    float[] widths = new float[columns];
     List<List<Piece>> cells = new ArrayList<>();
     List<Piece> header = new ArrayList<>();
     for (int j = 0; j < columns; j++) {
@@ -1417,30 +1476,45 @@ public final class Markdown {
       }
       cells.add(pieces);
     }
+    TableWidths widths = tableWidths(c, table, cells, head, body);
+    float[] natural = widths.natural().clone();
+    float[] least = widths.min().clone();
+    // Images are measured on every build: their width changes when they arrive. A picture scales
+    // down with its column; a placeholder does not, and counts as a word.
     for (int r = 0; r < cells.size(); r++) {
       for (int j = 0; j < columns; j++) {
-        Piece piece = cells.get(r).get(j);
-        float width;
-        if (piece == null) {
+        if (cells.get(r).get(j) == null) {
           List<Inline> content =
               r == 0 ? table.header().get(j) : table.rows().get(r - 1).get(j);
-          width = imageRowWidth(c, imagesOnly(content));
-        } else {
-          Theme.TextStyle style = r == 0 ? head : body;
-          width = TextSizing.natural(El.text(piece.text)
-              .font(style.font().get())
-              .fontSize(style.size())
-              .highlight(piece, piece));
+          List<Picture> pictures = imagesOnly(content);
+          natural[j] = Math.max(natural[j], imageRowWidth(c, pictures));
+          for (Picture picture : pictures) {
+            if (c.options.images.apply(picture.image().source()) == null) {
+              least[j] = Math.max(least[j], imageRowWidth(c, List.of(picture)));
+            }
+          }
         }
-        widths[j] = Math.max(widths[j], Math.min(width + 2, theme.prose().measure() / 2));
       }
     }
+    float[] basis = new float[columns];
+    float[] min = new float[columns];
+    float totalBasis = 2 * theme.size().stroke();
+    float totalMin = 2 * theme.size().stroke();
+    for (int j = 0; j < columns; j++) {
+      basis[j] = natural[j] + 2 + 2 * pad;
+      min[j] = Math.min(basis[j], least[j] + 2 + 2 * pad);
+      totalBasis += basis[j];
+      totalMin += min[j];
+    }
+    // Whole pixels: at a fractional scale, a fraction of overflow rounds away and does not scroll.
+    totalMin = (float) Math.ceil(totalMin);
     El grid = col()
         .role("table")
         .radius(theme.radius().medium())
         .border(theme.size().stroke(), theme.border().subtle())
-        .clip();
-    grid.style().width = Len.FIT_CONTENT;
+        .clip()
+        .minSize(totalMin, 0)
+        .maxSize(totalBasis, Float.POSITIVE_INFINITY);
     for (int r = 0; r < cells.size(); r++) {
       El line = row().role("row");
       if (r == 0) {
@@ -1457,19 +1531,20 @@ public final class Markdown {
             case RIGHT -> Style.Content.END;
             default -> Style.Content.START;
           };
-          cell = imageRow(c, imagesOnly(content)).justify(justify).w(widths[j]);
+          cell = imageRow(c, imagesOnly(content)).justify(justify).grow(1).minSize(0, 0);
         } else {
           Style.Align align = switch (table.aligns().get(j)) {
             case CENTER -> Style.Align.CENTER;
             case RIGHT -> Style.Align.END;
             default -> Style.Align.START;
           };
-          cell = field(c, piece, r == 0 ? head : body, c.color).w(widths[j]).textAlign(align);
+          cell = field(c, piece, r == 0 ? head : body, c.color).grow(1).textAlign(align);
         }
         line.child(row()
             .role(r == 0 ? "columnheader" : "cell")
-            .w(widths[j] + 2 * pad)
-            .shrink(0)
+            .basis(basis[j])
+            .minSize(min[j], 0)
+            .maxSize(basis[j], Float.POSITIVE_INFINITY)
             .padding(theme.space().s(), pad)
             .child(cell));
       }
@@ -1478,10 +1553,13 @@ public final class Markdown {
       }
       grid.child(line);
     }
-    El area = col().scrollBoth().scrollbars(theme.scrollbars()).child(grid);
-    area.style().paddingBottom =
+    // Room for the bar below only while the table scrolls, that is while the area is narrower
+    // than totalMin: then the two parts of totalMin no longer share a line, and the row gap
+    // between the two lines is the room.
+    El room = row().wrap().child(col().w(totalMin - 1)).child(col().w(1));
+    room.style().rowGap =
         Len.px(theme.scrollbars().thickness() + theme.scrollbars().margin());
-    return area;
+    return col().scrollBoth().scrollbars(theme.scrollbars()).child(grid).child(room);
   }
 
   // ---- As text
