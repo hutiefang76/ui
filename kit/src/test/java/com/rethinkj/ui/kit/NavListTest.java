@@ -101,6 +101,19 @@ class NavListTest {
   }
 
   @Test
+  void anOutlineTellsAPressOnItsCurrentItemAndANavListDoesNot() {
+    List<NavList.Entry> entries = List.of(NavList.item("A"), NavList.item("B"));
+    selected = -1;
+    NavList.navList(entries, 1, i -> selected = i).children().get(1).onPress().press(1, 0, 0, 0);
+    assertEquals(-1, selected, "a nav list tells only a change");
+    NavList.outline(entries, 1, i -> selected = i).children().get(1).onPress().press(1, 0, 0, 0);
+    assertEquals(1, selected, "an outline goes back to its current heading");
+    selected = -1;
+    NavList.outline(entries, 1, i -> selected = i).onKey().test(new Key("Enter"));
+    assertEquals(1, selected, "and so does Enter");
+  }
+
+  @Test
   void aPageKeyGoesOnPastAPageOfDisabledItems() {
     List<NavList.Entry> entries = List.of(
         NavList.item("A"),
