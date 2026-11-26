@@ -439,6 +439,32 @@ class MarkdownTest {
     assertEquals("SELECT 2;", fragmentClipboard.read());
   }
 
+  @Test
+  void aCodeBlocksMenuOpensAnywhereOnItsPanel() throws IOException {
+    App<Doc> app = app(DOC);
+    String tree = run(app, "frame\npress text=\"sql\" right\nframe\nadvance 1\nframe");
+    assertEquals("Copy-, Select all, Copy code", menuItems(tree), "on language badge");
+    tree = run(app, "key Escape\nframe\npress role=group at top+8 right\nframe\nadvance 1\nframe");
+    assertEquals("Copy-, Select all, Copy code", menuItems(tree), "on empty header");
+    tree = run(app, "key Escape\nframe\npress #wrap right\nframe\nadvance 1\nframe");
+    assertEquals("Copy-, Select all, Copy code", menuItems(tree), "on wrap button");
+    assertFalse(app.state().selection.wraps(0), "a secondary press does not toggle wrap");
+    app.clipboard().write("kept");
+    tree = run(app, "key Escape\nframe\npress #copy right\nframe\nadvance 1\nframe");
+    assertEquals("Copy-, Select all, Copy code", menuItems(tree), "on copy button");
+    assertEquals("kept", app.clipboard().read(), "a secondary press does not press copy");
+    tree = run(app, "key Escape\nframe\npress role=group at left+0 right\nframe\nadvance 1\nframe");
+    assertEquals("Copy-, Select all, Copy code", menuItems(tree), "on panel outside the text");
+    assertTrue(
+        bounds(tree, "role=group")[0] < bounds(tree, "role=code")[0],
+        "left edge of the panel is outside the code field");
+    tree =
+        run(app, "key Escape\nframe\nfocus #wrap\nframe\nkey ContextMenu\nframe\nadvance 1\nframe");
+    assertEquals("Copy-, Select all, Copy code", menuItems(tree), "Menu key from header button");
+    run(app, "press role=menuitem label=\"Copy code\"\nframe\nadvance 1\nframe");
+    assertEquals("SELECT 1;", app.clipboard().read());
+  }
+
   private static String menuItems(String tree) {
     return tree.lines()
         .filter(l -> l.contains("role=menuitem"))
