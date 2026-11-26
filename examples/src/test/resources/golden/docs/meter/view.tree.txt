@@ -6,12 +6,12 @@ el 0,0 520x56
       text "Storage 24%" 228,21 76x15
     el #marker label="Soft limit" 406,12 4x32 value="80%"
     el 12,12 496x32
-    el #trailing-layer 12,12 496x32
-      el 12,12 496x0
-      el 12,12 496x32
-        el 12,12 300x32
-        el 312,12 141x32
-        el #trailing 461,12 39x32
+    el #trailing-layer 12,-20 496x96
+      el 12,-20 496x0
+      el 12,-20 496x96
+        el 12,-20 300x96
+        el 312,-20 141x96
+        el #trailing 461,-20 39x96
           el 461,19 39x18
             el label="66%" 461,19 39x18
               text "66%" 467,21 27x15
