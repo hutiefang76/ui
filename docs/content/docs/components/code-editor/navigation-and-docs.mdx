@@ -45,6 +45,19 @@ All three commands also work in read-only editors, and pass their shortcut throu
 
 <Shot src="examples/docs/code-editor-navigation/usages-{theme}" alt="SQL in the code editor with usages of paid_orders highlighted and the Find Usages menu open at the cursor" />
 
+### Background providers
+
+When symbol knowledge lives outside the process (such as a language server or database catalog), use `documentationInBackground(name, provider)`, `declarationInBackground(name, provider)`, and `usagesInBackground(name, provider)` instead so lookups run through `App.background` without stalling the frame. Setting a background provider replaces any plain provider of the same kind, and vice versa. The provider gets only the offset, so hand it the text the offset is in through its closure, and nothing else of the app's state that the app's thread changes; setting it on each build keeps its work running as long as the name stays the same.
+
+```java snippet="code-editor-navigation-background"
+```
+
+- Only the latest request per kind delivers: requesting another offset or text cancels the previous one, whose provider may still run if it ignores the interrupt, and any result arriving for a different text is dropped.
+- **Documentation (`Ctrl+Q` / hover):** Opens the popover on arrival if the caret or pointer is still on the same word; nothing opens for `null`.
+- **Declaration (`Ctrl+B` / `Ctrl+click` / `Ctrl+hover`):** Navigates on arrival if the caret and text are unchanged. **Ctrl+hover** starts after `Theme.Motion.tooltipDelay` and underlines the word once a declaration arrives.
+- **Usages (`Alt+F7` / `Ctrl+Shift+F7`):** **Alt+F7** opens the usages menu at once with a `"Loading…"` row until the usages arrive (closing if none); **Ctrl+Shift+F7** highlights them on arrival.
+- Call `App.await(name, timeout)` in tests and scripts to wait deterministically for a named provider.
+
 ## Code completion
 
 For language servers or providers that need more than the word prefix, use `Completion.completeWithContext` (or `Completion.completeWithContextInBackground` to compute suggestions off the app thread). Your provider receives a [`Completion.Context`](/api/com/rethinkj/ui/kit/Completion.Context.html) containing an immutable snapshot of the document `text`, `caret`, `wordFrom`, `wordTo` (and `word()`), the [`Completion.Trigger`](/api/com/rethinkj/ui/kit/Completion.Trigger.html) that opened the list (`TYPED`, `OPEN_AFTER`, or `INVOKED` on **Ctrl+Space** or `State.open()`), and `character` when opened by `State.openAfter`.
