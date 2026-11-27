@@ -566,7 +566,13 @@ final class Editor {
     newAnchor = fitted(newAnchor, from, inserted, fitted, length);
     doc.clearRun();
     unfoldPending = true;
-    edit(from, to - from, fitted, newCaret, newAnchor, null, false);
+    if (from == to && fitted.isEmpty()) {
+      doc.keepHistory();
+      propose(from, 0, fitted, newCaret, newAnchor);
+      doc.setRun(this, null);
+    } else {
+      edit(from, to - from, fitted, newCaret, newAnchor, null, false);
+    }
     asked |= ask;
   }
 
@@ -607,6 +613,7 @@ final class Editor {
     }
     int room = max < 0 ? -1 : Math.max(0, max - keptCp - text.codePointCount(prevTo, len));
     String[] fitted = new String[n];
+    boolean empty = true;
     for (int i = 0; i < n; i++) {
       String lined = fitLines(raw[i]);
       if (room >= 0) {
@@ -614,6 +621,7 @@ final class Editor {
         room -= lined.codePointCount(0, lined.length());
       }
       fitted[i] = lined;
+      empty &= froms[i] == tos[i] && lined.isEmpty();
     }
     int firstFrom = froms[0];
     int lastTo = tos[n - 1];
@@ -635,19 +643,21 @@ final class Editor {
     doc.clearRun();
     unfoldPending = true;
     doc.keepHistory();
-    String gone = text.substring(firstFrom, lastTo);
-    TextDocument.push(
-        doc.undo,
-        new TextDocument.Step(
-            firstFrom,
-            gone,
-            spanInserted,
-            caret,
-            anchor,
-            caretAfter,
-            anchorAfter,
-            gone.equals(spanInserted)));
-    doc.redo.clear();
+    if (!empty) {
+      String gone = text.substring(firstFrom, lastTo);
+      TextDocument.push(
+          doc.undo,
+          new TextDocument.Step(
+              firstFrom,
+              gone,
+              spanInserted,
+              caret,
+              anchor,
+              caretAfter,
+              anchorAfter,
+              gone.equals(spanInserted)));
+      doc.redo.clear();
+    }
     propose(firstFrom, lastTo - firstFrom, spanInserted, pending, caretAfter, anchorAfter);
     doc.setRun(this, null);
     asked |= ask;
