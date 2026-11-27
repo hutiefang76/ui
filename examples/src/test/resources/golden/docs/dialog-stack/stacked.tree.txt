@@ -21,7 +21,7 @@ overlay center modal scrim on 0,0 440x340
     el 120,140 200x92
       el #dialog-content 116,136 214x70
         el 120,140 200x56
-          el role=combobox label="sslmode" 120,140 200x24 expanded=false focused
+          el role=combobox label="sslmode" 120,140 200x24 expanded=false value="sslmode" focused
             text "sslmode" 129,144 162x16
             text label="chevron_down" "\u{F2A2}" 295,144 16x16
           text role=textbox label="Value" "" 120,172 200x24

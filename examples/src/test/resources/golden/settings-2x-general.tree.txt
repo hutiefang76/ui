@@ -71,7 +71,7 @@ el 0,0 880x600
           el 243,218 602x36
             el 253,228 410x15
               text "Language" 253,228 410x15
-            el role=combobox label="English" 675,224 160x24 expanded=false
+            el role=combobox label="English" 675,224 160x24 expanded=false value="English"
               text "English" 684,228 122x15
               text label="chevron_down" "\u{F2A2}" 810,228 16x16
       el 240,281 608x146

@@ -21,7 +21,7 @@ el 0,0 520x640
       el 19,171 482x36
         el 29,181 290x15
           text "Font" 29,181 290x15
-        el #font role=combobox label="JetBrains Mono" 331,177 160x24 expanded=false
+        el #font role=combobox label="JetBrains Mono" 331,177 160x24 expanded=false value="JetBrains Mono"
           text "JetBrains Mono" 340,181 122x15
           text label="chevron_down" "\u{F2A2}" 466,181 16x16
       el 17,209 486x1

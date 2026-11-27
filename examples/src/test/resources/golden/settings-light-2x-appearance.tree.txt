@@ -72,7 +72,7 @@ el 0,0 880x600
             el 253,183 410x33
               text "Accent color" 253,183 410x15
               text "Buttons, switches and selections" 253,200 410x16
-            el role=combobox label="Blue" 675,187 160x24 expanded=false
+            el role=combobox label="Blue" 675,187 160x24 expanded=false value="Blue"
               text "Blue" 684,191 122x16
               text label="chevron_down" "\u{F2A2}" 810,191 16x16
       el 240,249 608x185

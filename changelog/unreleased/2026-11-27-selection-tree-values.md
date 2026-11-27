@@ -1,0 +1,1 @@
+- Select and ComboBox keep the current choice as a separate value in tree dumps when their label is overridden.

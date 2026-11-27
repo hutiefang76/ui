@@ -43,7 +43,7 @@ el 0,0 440x472
                 text "Database" 25,160 58x16
                 text "*" 85,160 6x16
               el 99,156 316x24
-                el #database role=combobox label="" 99,156 316x24 expanded=false
+                el #database role=combobox label="" 99,156 316x24 expanded=false value=""
                   text #field-0 role=textbox "" 99,156 316x24
                   el role=button label="Open" 386,156 29x24
                     text label="chevron_down" "\u{F2A2}" 390,160 16x16

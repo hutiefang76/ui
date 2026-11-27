@@ -157,7 +157,7 @@ class ComboBoxTest {
   void aPressOpensTheChoicesWithTheCurrentOneHighlightedAndTypingFilters() throws IOException {
     String tree = run("press #database");
     assertTrue(tree.contains("el #database role=combobox label=\"shop\""), tree);
-    assertTrue(line(tree, "#database").endsWith(" expanded"), tree);
+    assertTrue(line(tree, "#database").contains(" expanded value=\"shop\""), tree);
     assertTrue(tree.contains("role=textbox label=\"shop\"") && tree.contains("focused"), tree);
     assertTrue(tree.contains("el #option-10 role=option label=\"shop\""), tree);
     assertTrue(line(tree, "#option-10").contains(" selected"), "the current choice: " + tree);

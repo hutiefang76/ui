@@ -430,7 +430,7 @@ overlay bottom start gap 4 on #filter-5 role=button label="Filter status" 533,12
     el 336,45 200x150
       text role=heading "Filter status" 336,45 200x16 level=3
       el 336,69 200x126
-        el #kind role=combobox label="One of" 336,69 200x24 expanded=false focused
+        el #kind role=combobox label="One of" 336,69 200x24 expanded=false value="One of" focused
           text "One of" 345,73 162x16
           text label="chevron_down" "\u{F2A2}" 511,73 16x16
         el #values 336,97 200x70

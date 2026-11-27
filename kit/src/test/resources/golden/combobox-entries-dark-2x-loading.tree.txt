@@ -1,5 +1,5 @@
 el 0,0 300x240
-  el #table role=combobox label="pinned_table" 12,12 220x24 expanded
+  el #table role=combobox label="pinned_table" 12,12 220x24 expanded value="pinned_table"
     text role=textbox label="pinned_table" "" 12,12 220x24 focused caret 0
     el role=button label="Close" 203,12 29x24
       text label="chevron_down" "\u{F2A2}" 207,16 16x16
