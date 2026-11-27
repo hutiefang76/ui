@@ -1,5 +1,5 @@
 el 0,0 300x260
-  el #provider role=combobox label="PostgreSQL" 12,12 240x24 expanded value="PostgreSQL"
+  el #provider role=combobox label="PostgreSQL" 12,12 240x24 expanded
     text role=textbox label="PostgreSQL" "" 12,12 240x24 focused caret 0
     el role=button label="Close" 223,12 29x24
       text label="chevron_down" "\u{F2A2}" 227,16 16x16

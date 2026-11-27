@@ -77,7 +77,7 @@ el 0,0 880x600
           el 243,259 602x36
             el 253,269 410x16
               text "Font" 253,269 410x16
-            el role=combobox label="JetBrains Mono" 675,265 160x24 expanded=false value="JetBrains Mono"
+            el role=combobox label="JetBrains Mono" 675,265 160x24 expanded=false
               text "JetBrains Mono" 684,269 122x16
               text label="chevron_down" "\u{F2A2}" 810,269 16x16
       el 240,322 608x309

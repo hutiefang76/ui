@@ -6,7 +6,7 @@ el 0,0 360x240
       text "Rename…" 77,16 62x16
     el #help role=button label="?" 156,12 33x24 focused
       text "?" 169,16 7x16
-    el #encoding role=combobox label="UTF-8" 193,12 120x24 expanded=false value="UTF-8"
+    el #encoding role=combobox label="UTF-8" 193,12 120x24 expanded=false
       text "UTF-8" 202,16 82x16
       text label="chevron_down" "\u{F2A2}" 288,16 16x16
   el 12,44 336x161

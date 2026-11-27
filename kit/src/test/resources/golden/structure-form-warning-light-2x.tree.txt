@@ -4,7 +4,7 @@ el 0,0 560x220
       el 16,16 37x24
         text "Driver" 16,20 37x16
       el 61,16 483x42
-        el #driver role=combobox label="42.7.15" 61,16 180x24 expanded=false value="42.7.15" warning="42.7.15 is 1 day old; 42.7.14 has been out for a month"
+        el #driver role=combobox label="42.7.15" 61,16 180x24 expanded=false warning="42.7.15 is 1 day old; 42.7.14 has been out for a month"
           text "42.7.15" 70,20 142x16
           text label="chevron_down" "\u{F2A2}" 216,20 16x16
         el 61,42 483x16
