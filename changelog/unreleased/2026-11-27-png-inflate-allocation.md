@@ -1,0 +1,1 @@
+- PNG decoding no longer reserves the large image-data size claimed by a small malformed file before inflation.

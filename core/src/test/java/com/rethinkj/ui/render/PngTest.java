@@ -15,8 +15,8 @@ class PngTest {
 
   @Test
   void pixelsSurviveWritingAndReading() {
-    int width = 37;
-    int height = 23;
+    int width = 257;
+    int height = 129;
     byte[] rgba = new byte[width * height * 4];
     for (int i = 0; i < rgba.length; i++) {
       rgba[i] = (byte) (i * 31 + i / 7);
@@ -319,5 +319,33 @@ class PngTest {
   void rejectsWhatIsNotPng() {
     assertThrows(IllegalArgumentException.class, () -> Png.decode(new byte[] {1, 2, 3}));
     assertThrows(IllegalArgumentException.class, () -> Png.decode("not a png at all".getBytes()));
+  }
+
+  private static byte[] pngWithHeader(
+      int width, int height, byte bitDepth, byte colorType, byte interlace) {
+    Pixels tiny = new Pixels(1, 1, new byte[] {1, 2, 3, 4});
+    byte[] encoded = Png.encode(tiny);
+    java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+    out.write(encoded, 0, 8); // signature
+    chunk(
+        out,
+        "IHDR",
+        java.nio.ByteBuffer.allocate(13)
+            .putInt(width)
+            .putInt(height)
+            .put(bitDepth)
+            .put(colorType)
+            .put((byte) 0) // compression
+            .put((byte) 0) // filter
+            .put(interlace)
+            .array());
+    out.write(encoded, 33, encoded.length - 33); // rest of original chunks (IDAT, IEND)
+    return out.toByteArray();
+  }
+
+  @Test
+  void shortImageDataCannotAllocateTheSizeOfALargeHeader() {
+    byte[] png = pngWithHeader(16384, 8192, (byte) 16, (byte) 6, (byte) 0);
+    assertThrows(IllegalArgumentException.class, () -> Png.decode(png));
   }
 }
