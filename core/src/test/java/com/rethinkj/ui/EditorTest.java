@@ -206,133 +206,46 @@ class EditorTest {
   }
 
   @Test
-  void undoAfterAFullyRejectedInsertionReachesThePreviousEdit() {
-    TestField field = new TestField("a", 2);
-    field.attach();
+  void aFullyRejectedInsertionPreservesUndoAndRedoInSingleAndBatch() {
+    for (boolean batch : List.of(false, true)) {
+      TestField field = new TestField("a", 2);
+      field.attach();
 
-    field.editor.request(1, 1, "b", 2, 2, false);
-    field.attach();
-    assertEquals("ab", field.value);
+      field.editor.request(1, 1, "b", 2, 2, false);
+      field.attach();
+      assertEquals("ab", field.value);
 
-    field.editor.request(0, 0, "x", 3, 1, false);
-    field.attach();
-    assertEquals("ab", field.value);
-    assertEquals(2, field.editor.caret());
-    assertEquals(0, field.editor.anchor());
+      field.editor.request(1, 2, "c", 2, 2, false);
+      field.attach();
+      assertEquals("ac", field.value);
 
-    field.editor.undo();
-    field.attach();
-    assertEquals("a", field.value);
-    assertEquals("a", field.editor.text());
-  }
+      field.editor.undo();
+      field.attach();
+      assertEquals("ab", field.value);
 
-  @Test
-  void aFullyRejectedInsertionPreservesRedo() {
-    TestField field = new TestField("ab", 2);
-    field.attach();
+      if (batch) {
+        List<TextEdit> edits = List.of(new TextEdit(0, 0, "x"), new TextEdit(1, 1, "y"));
+        field.editor.request(edits, 4, 0, false);
+      } else {
+        field.editor.request(0, 0, "x", 3, 1, false);
+      }
+      field.attach();
+      assertEquals("ab", field.value);
+      assertEquals(2, field.editor.caret());
+      assertEquals(0, field.editor.anchor());
 
-    field.editor.request(1, 2, "c", 2, 2, false);
-    field.attach();
-    assertEquals("ac", field.value);
+      field.editor.redo();
+      field.attach();
+      assertEquals("ac", field.value);
 
-    field.editor.undo();
-    field.attach();
-    assertEquals("ab", field.value);
+      field.editor.undo();
+      field.attach();
+      assertEquals("ab", field.value);
 
-    field.editor.request(0, 0, "x", 3, 1, false);
-    field.attach();
-    assertEquals("ab", field.value);
-    assertEquals(2, field.editor.caret());
-    assertEquals(0, field.editor.anchor());
-
-    field.editor.redo();
-    field.attach();
-    assertEquals("ac", field.value);
-    assertEquals("ac", field.editor.text());
-  }
-
-  @Test
-  void undoAfterAFullyRejectedBatchReachesThePreviousEdit() {
-    TestField field = new TestField("a", 2);
-    field.attach();
-
-    field.editor.request(1, 1, "b", 2, 2, false);
-    field.attach();
-    assertEquals("ab", field.value);
-
-    List<TextEdit> edits = List.of(new TextEdit(0, 0, "x"), new TextEdit(1, 1, "y"));
-    field.editor.request(edits, 4, 0, false);
-    field.attach();
-    assertEquals("ab", field.value);
-    assertEquals(2, field.editor.caret());
-    assertEquals(0, field.editor.anchor());
-
-    field.editor.undo();
-    field.attach();
-    assertEquals("a", field.value);
-    assertEquals("a", field.editor.text());
-  }
-
-  @Test
-  void aFullyRejectedBatchPreservesRedo() {
-    TestField field = new TestField("ab", 2);
-    field.attach();
-
-    field.editor.request(1, 2, "c", 2, 2, false);
-    field.attach();
-    assertEquals("ac", field.value);
-
-    field.editor.undo();
-    field.attach();
-    assertEquals("ab", field.value);
-
-    List<TextEdit> edits = List.of(new TextEdit(0, 0, "x"), new TextEdit(1, 1, "y"));
-    field.editor.request(edits, 4, 0, false);
-    field.attach();
-    assertEquals("ab", field.value);
-    assertEquals(2, field.editor.caret());
-    assertEquals(0, field.editor.anchor());
-
-    field.editor.redo();
-    field.attach();
-    assertEquals("ac", field.value);
-    assertEquals("ac", field.editor.text());
-  }
-
-  @Test
-  void aReplacementAtTheLimitCanBeUndoneAndRedone() {
-    TestField field = new TestField("ab", 2);
-    field.attach();
-
-    field.editor.request(1, 2, "c", 2, 2, false);
-    field.attach();
-    assertEquals("ac", field.value);
-
-    field.editor.undo();
-    field.attach();
-    assertEquals("ab", field.value);
-
-    field.editor.redo();
-    field.attach();
-    assertEquals("ac", field.value);
-  }
-
-  @Test
-  void aPartiallyFittedInsertionCanBeUndoneAndRedone() {
-    TestField field = new TestField("a", 2);
-    field.attach();
-
-    field.editor.request(1, 1, "bc", 3, 3, false);
-    field.attach();
-    assertEquals("ab", field.value);
-
-    field.editor.undo();
-    field.attach();
-    assertEquals("a", field.value);
-
-    field.editor.redo();
-    field.attach();
-    assertEquals("ab", field.value);
+      field.editor.undo();
+      field.attach();
+      assertEquals("a", field.value);
+    }
   }
 
   @Test

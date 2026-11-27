@@ -65,8 +65,6 @@ See [`El` Javadoc](/api/com/rethinkj/ui/El.html#method-summary) for additional o
 
 From event handlers, you can programmatically edit or undo/redo a field with `app.edit(field, from, to, text, caret)`, `app.edit(field, edits, caret)` (for several non-overlapping `TextEdit`s in one undo step), `app.select(field, caret, anchor)`, `app.undo(field)`, and `app.redo(field)`. You can also pass an `anchor` argument to `app.edit` to select text with the edit, and an `expected` string after it to skip the edit if the field's string changed before it runs. If your app rejects the edit, the selection stays unchanged.
 
-If `maxLength` rejects an entire insertion without replacing any text, `app.edit` keeps the undo and redo history; the requested caret and selection still apply after fitting.
-
 ## Folding lines
 
 Pass `folds(List<El.Fold>, Consumer<El.Fold>)` on a multi-line field to collapse line ranges. Each `El.Fold(first, last)` keeps line `first` visible with a placeholder mark (`…` by default, or an element built by the three-argument overload's `mark` function) after its end and hides lines `first + 1` through `last`. Ranges may be unsorted, overlapping, or nested (a line is hidden if any fold hides it, and the outermost fold owns the visible mark); ranges past the end of the text are clamped or ignored.
