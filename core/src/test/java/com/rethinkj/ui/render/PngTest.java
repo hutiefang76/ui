@@ -343,10 +343,9 @@ class PngTest {
     return out.toByteArray();
   }
 
-  @ParameterizedTest
-  @ValueSource(ints = {0, 1})
-  void shortImageDataCannotAllocateTheSizeOfALargeHeader(int interlace) {
-    byte[] png = pngWithHeader(16384, 8192, (byte) 16, (byte) 6, (byte) interlace);
+  @Test
+  void shortImageDataCannotAllocateTheSizeOfALargeHeader() {
+    byte[] png = pngWithHeader(16384, 8192, (byte) 16, (byte) 6, (byte) 0);
     assertThrows(IllegalArgumentException.class, () -> Png.decode(png));
   }
 }

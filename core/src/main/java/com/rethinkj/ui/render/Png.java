@@ -3,6 +3,7 @@ package com.rethinkj.ui.render;
 import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.zip.CRC32;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
@@ -358,7 +359,7 @@ public final class Png {
       int read = 0;
       while (read < size && !inflater.finished()) {
         if (read == raw.length) {
-          raw = java.util.Arrays.copyOf(raw, (int) Math.min(size, raw.length * 2L));
+          raw = Arrays.copyOf(raw, (int) Math.min(size, raw.length * 2L));
         }
         int n = inflater.inflate(raw, read, raw.length - read);
         if (n == 0 && (inflater.needsInput() || inflater.needsDictionary())) {
