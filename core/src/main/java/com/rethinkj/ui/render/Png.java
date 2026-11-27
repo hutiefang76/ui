@@ -358,7 +358,7 @@ public final class Png {
       int read = 0;
       while (read < size && !inflater.finished()) {
         if (read == raw.length) {
-          raw = java.util.Arrays.copyOf(raw, (int) Math.min((long) size, raw.length * 2L));
+          raw = java.util.Arrays.copyOf(raw, (int) Math.min(size, raw.length * 2L));
         }
         int n = inflater.inflate(raw, read, raw.length - read);
         if (n == 0 && (inflater.needsInput() || inflater.needsDictionary())) {
