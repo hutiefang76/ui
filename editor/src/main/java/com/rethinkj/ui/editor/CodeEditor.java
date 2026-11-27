@@ -4,6 +4,7 @@ import com.rethinkj.ui.App;
 import com.rethinkj.ui.CodeWords;
 import com.rethinkj.ui.Colors;
 import com.rethinkj.ui.Cursor;
+import com.rethinkj.ui.Drag;
 import com.rethinkj.ui.El;
 import com.rethinkj.ui.FieldState;
 import com.rethinkj.ui.Formatted;
@@ -389,6 +390,21 @@ public final class CodeEditor {
     }
   }
 
+  /**
+   * An inclusive range of 0-based lines in the editor, reported to {@link State#lineAction}.
+   *
+   * @param first first line index, 0 or more
+   * @param last last line index, at least {@code first}
+   */
+  public record Lines(int first, int last) {
+    public Lines {
+      if (first < 0 || last < first) {
+        throw new IllegalArgumentException(
+            "first must be 0 or more and last at least first, were " + first + " and " + last);
+      }
+    }
+  }
+
   /** The command of a key, or null. */
   static Command command(Key k) {
     int mods = k.modifiers();
@@ -455,6 +471,11 @@ public final class CodeEditor {
     private boolean caretPlaced; // whether the caret was explicitly placed, not the initial 0
     private String text = ""; // the string of the editor's last build
     private List<Marker> markers = List.of();
+    private LineAction lineAction;
+    // A gutter line-action drag: the line it began on and the lines it covers, null while none.
+    private int dragAnchor = -1;
+    private Lines dragLines;
+    private El built; // the field of the last build, also without an app, for the gutter's drag
     private final Map<String, Layer> layers = new LinkedHashMap<>();
     private List<Vision> codeVision = List.of();
     private int blockFrom;
@@ -559,6 +580,8 @@ public final class CodeEditor {
         Function<El.Block, El> gutter) {}
 
     record OldNumbers(int maxLine, int newMaxLine, IntFunction<String> label) {}
+
+    private record LineAction(Icon symbol, String label, Consumer<Lines> onPress) {}
 
     void extraBlocks(ExtraBlocks extraBlocks) {
       this.extraBlocks = extraBlocks;
@@ -795,6 +818,27 @@ public final class CodeEditor {
      */
     public State markers(List<Marker> markers) {
       this.markers = List.copyOf(markers);
+      return this;
+    }
+
+    /**
+     * Offers an action on any line from the gutter and the editor's context menu, such as starting
+     * a review comment. While set, hovering a line's gutter cell shows {@code symbol} as a quiet
+     * icon button in the icon lane to the left of the line number, with {@code label} as its
+     * tooltip and accessible name, and reserves that slot on every line so line numbers do not
+     * shift. Pressing the button passes its line to {@code onPress}, or the selected lines when it
+     * lies inside a selection spanning several lines; pressing and dragging over the gutter picks a
+     * range in either direction, previewed in {@code code().note()}, and reports it on
+     * release (Escape cancels). Passing a null {@code symbol} or {@code onPress} removes it.
+     */
+    public State lineAction(Icon symbol, String label, Consumer<Lines> onPress) {
+      if (symbol == null || onPress == null) {
+        lineAction = null;
+        dragLines = null;
+        return this;
+      }
+      Objects.requireNonNull(label, "label");
+      lineAction = new LineAction(symbol, label, onPress);
       return this;
     }
 
@@ -1621,6 +1665,11 @@ public final class CodeEditor {
           } else if (!state.diff && state.caret >= start && state.caret <= end) {
             out.lineBackground(code.line());
           }
+          if (state.dragLines != null
+              && line >= state.dragLines.first()
+              && line <= state.dragLines.last()) {
+            out.lineBackground(code.note());
+          }
           guides(text, code.guide(), out);
           for (int at : pair) {
             out.background(at - start, at - start + 1, code.bracket());
@@ -1714,6 +1763,32 @@ public final class CodeEditor {
     attachPointerNavigation(app, state, editor, value, extra);
     // The rail starts at the frame: the field's padding lies after the gutter.
     editor.style().paddingLeft = Len.ZERO;
+    state.built = editor;
+    boolean hasFind = app != null && state.findBar;
+    State.LineAction lineAction = state.lineAction;
+    if (hasFind || lineAction != null) {
+      editor.fieldMenu((field, open) -> {
+        Texts texts = Texts.CURRENT.get();
+        List<Menu.Item> more = new ArrayList<>();
+        if (hasFind) {
+          boolean edits =
+              field.onEdit() != null && !field.isReadOnly(); // also if made so after this
+          more.add(Menu.separator());
+          more.add(Menu.item(texts.find(), () -> Find.open(state.find)).shortcut(Key.CONTROL, "F"));
+          more.add(Menu.item(texts.replace(), edits ? () -> Find.openReplace(state.find) : null)
+              .shortcut(Key.CONTROL, "H"));
+        }
+        if (lineAction != null) {
+          more.add(Menu.separator());
+          more.add(Menu.item(
+              lineAction.label(),
+              () -> lineAction
+                  .onPress()
+                  .accept(selectedLines(field.text().string(), state.caret, state.anchor))));
+        }
+        return TextField.menu(field, open, more);
+      });
+    }
     if (app == null) {
       if (state.doc != null) {
         editor.onKey(k -> {
@@ -1763,18 +1838,6 @@ public final class CodeEditor {
     if (!state.findBar) {
       return editor;
     }
-    editor.fieldMenu((field, open) -> {
-      Texts texts = Texts.CURRENT.get();
-      boolean edits = field.onEdit() != null && !field.isReadOnly(); // also if made so after this
-      return TextField.menu(
-          field,
-          open,
-          List.of(
-              Menu.separator(),
-              Menu.item(texts.find(), () -> Find.open(state.find)).shortcut(Key.CONTROL, "F"),
-              Menu.item(texts.replace(), edits ? () -> Find.openReplace(state.find) : null)
-                  .shortcut(Key.CONTROL, "H")));
-    });
     // Commands the editor takes only where applicable stay the app's.
     return Find.find(app, editor, state.find, k -> {
       Command command = command(k);
@@ -2113,7 +2176,12 @@ public final class CodeEditor {
     cell.child(marker(theme, diagnostics, hasFixes, fixError, state.quickFixes::open, line)
         .w(mono.size())
         .shrink(0));
-    if (markerSlots > 0) {
+    // A row of a multi-line placeholder past the empty text's one line gets no button.
+    boolean placeholderRow = line.index() > 0 && editor.text().placeholderShown();
+    El action =
+        state.lineAction == null || placeholderRow ? null : lineActionControl(theme, state, line);
+    int slots = markerSlots + (state.lineAction == null ? 0 : 1);
+    if (slots > 0) {
       // A rendered doc comment's one cell shows the markers of its first line only, found in the
       // committed text that the comment and the markers count in.
       int from = line.start();
@@ -2134,7 +2202,11 @@ public final class CodeEditor {
           }
         }
       }
-      for (int i = placed; i < markerSlots; i++) {
+      if (action != null) { // the next free slot, kept free on every line so numbers stay put
+        cell.child(action);
+        placed++;
+      }
+      for (int i = placed; i < slots; i++) {
         cell.child(El.el().w(mono.size()).shrink(0));
       }
     }
@@ -2165,7 +2237,19 @@ public final class CodeEditor {
           .grow(1));
     }
     cell.child(changeBar(theme, changes, line));
-    cell.child(gutterControl(app, theme, state, editor, cell, line));
+    El control = gutterControl(app, theme, state, editor, line);
+    cell.child(control);
+    boolean hiddenControl = control.opacity() == 0; // a fold chevron shown on hover
+    if (action != null || hiddenControl) {
+      cell.whenHovered(e -> {
+        if (action != null) {
+          action.opacity(1);
+        }
+        if (hiddenControl) {
+          control.opacity(1);
+        }
+      });
+    }
     for (Highlight h : notes) {
       if (touchesLine(h.from, h.to, line.start(), line.end())) {
         El stripe = El.el()
@@ -2262,7 +2346,7 @@ public final class CodeEditor {
    * (pencil when rendered, eye when raw in reader mode), otherwise the fold chevron.
    */
   private static El gutterControl(
-      App<?> app, Theme theme, State state, El editor, El cell, El.Gutter.Line line) {
+      App<?> app, Theme theme, State state, El editor, El.Gutter.Line line) {
     DocRange doc = state.docAtLine(line.index());
     if (doc != null) {
       boolean rendered = state.isDocRendered(doc);
@@ -2288,7 +2372,7 @@ public final class CodeEditor {
         return Tooltip.tooltip(button, label);
       }
     }
-    return foldControl(app, theme, state, editor, cell, line);
+    return foldControl(app, theme, state, editor, line);
   }
 
   /**
@@ -2296,7 +2380,7 @@ public final class CodeEditor {
    * starts a foldable range, or an empty placeholder of the same width so line numbers stay fixed.
    */
   private static El foldControl(
-      App<?> app, Theme theme, State state, El editor, El cell, El.Gutter.Line line) {
+      App<?> app, Theme theme, State state, El editor, El.Gutter.Line line) {
     float size = theme.type().mono().size();
     Texts texts = Texts.CURRENT.get();
     El.Fold folded = state.foldAt(line.index());
@@ -2318,7 +2402,7 @@ public final class CodeEditor {
     }
     El.BracketFold range = rangeAt(state.ranges, line.index());
     if (range != null) {
-      El button = El.row()
+      return El.row()
           .key("fold-line-" + line.index())
           .role("button")
           .label(texts.fold())
@@ -2333,8 +2417,6 @@ public final class CodeEditor {
           .keepFocus()
           .whenHovered(e -> e.fill(theme.surface().hover()))
           .child(Icon.icon(Symbol.CHEVRON_DOWN, Icon.Variant.MUTED, size));
-      cell.whenHovered(e -> button.opacity(1));
-      return button;
     }
     return El.el().w(size).shrink(0);
   }
@@ -2452,6 +2534,136 @@ public final class CodeEditor {
       place.onPress(marker.onPress).keepFocus();
     }
     return Tooltip.tooltip(place, marker.label);
+  }
+
+  /**
+   * The gutter line-action button of a line: hidden until its cell is hovered (or while its drag
+   * runs), left of the line number, reporting its line, a multi-line selection containing it, or a
+   * dragged range of lines.
+   */
+  private static El lineActionControl(Theme theme, State state, El.Gutter.Line line) {
+    State.LineAction action = state.lineAction;
+    float size = theme.type().mono().size();
+    int lineIndex = line.index();
+    El button = El.row()
+        .key("action-line-" + lineIndex)
+        .role("button")
+        .label(action.label())
+        .size(size, size)
+        .align(Style.Align.CENTER)
+        .justify(Style.Content.CENTER)
+        .shrink(0)
+        .radius(theme.radius().small())
+        .cursor(Cursor.POINTER)
+        .opacity(state.dragLines != null && state.dragAnchor == lineIndex ? 1 : 0)
+        .keepFocus()
+        .whenHovered(e -> e.fill(theme.surface().hover()))
+        .child(Icon.icon(action.symbol(), Icon.Variant.MUTED, size));
+    button.onPress(() -> {
+      State.LineAction current = state.lineAction;
+      if (current == null) {
+        return;
+      }
+      Lines selected = selectedLines(state.built.text().string(), state.caret, state.anchor);
+      Lines target = selected.first() < selected.last()
+              && lineIndex >= selected.first()
+              && lineIndex <= selected.last()
+          ? selected
+          : new Lines(lineIndex, lineIndex);
+      current.onPress().accept(target);
+    });
+    button.onDrag(drag -> {
+      State.LineAction current = state.lineAction;
+      if (current == null || drag.phase() == Drag.Phase.CANCEL) {
+        state.dragLines = null;
+        return;
+      }
+      Lines lines = dragLines(state, lineIndex, drag);
+      if (drag.phase() == Drag.Phase.END) {
+        Lines done = lines != null ? lines : state.dragLines;
+        state.dragLines = null;
+        current.onPress().accept(done != null ? done : new Lines(lineIndex, lineIndex));
+        return;
+      }
+      state.dragAnchor = lineIndex;
+      if (lines != null) {
+        state.dragLines = lines;
+      }
+    });
+    return Tooltip.tooltip(button, action.label());
+  }
+
+  /**
+   * The 0-based inclusive lines of the caret or selection in {@code text}; a selection ending at
+   * the start of a line leaves that line out, as {@link LineEdits#block} does.
+   */
+  private static Lines selectedLines(String text, int caret, int anchor) {
+    int len = text.length();
+    int s = Math.clamp(Math.min(caret, anchor), 0, len);
+    int e = Math.clamp(Math.max(caret, anchor), 0, len);
+    int last = e > s && e == LineEdits.lineStart(text, e) ? e - 1 : e;
+    return new Lines(lineOf(text, s), lineOf(text, last));
+  }
+
+  /**
+   * The lines from the cell of line {@code anchor} to the gutter cell under a drag step that began
+   * on its action button, found among the laid-out cells, or null when they are not there. A
+   * folded range or a rendered doc comment counts whole.
+   */
+  private static Lines dragLines(State state, int anchor, Drag drag) {
+    if (state.built.text().placeholderShown()) {
+      return new Lines(0, 0);
+    }
+    El gutter = null;
+    for (El child : state.built.children()) {
+      if ("gutter".equals(child.key())) {
+        gutter = child;
+      }
+    }
+    if (gutter == null || Double.isNaN(drag.y())) {
+      return null;
+    }
+    List<El> cells = new ArrayList<>(); // without the cells of blocks between lines
+    for (El child : gutter.children()) {
+      if (child.key() != null && child.key().startsWith("line-")) {
+        cells.add(child);
+      }
+    }
+    double y = Double.NaN;
+    for (El cell : cells) {
+      if (("line-" + anchor).equals(cell.key())) {
+        for (El child : cell.children()) { // the live button: the cell may have grown since
+          if (("action-line-" + anchor).equals(child.key())) {
+            y = cell.y() + child.y() + drag.y();
+          }
+        }
+      }
+    }
+    if (Double.isNaN(y)) {
+      return null;
+    }
+    int first = anchor;
+    int last = anchor;
+    for (int i = 0; i < cells.size(); i++) {
+      El cell = cells.get(i);
+      int index = cellLine(cell);
+      El.Fold fold = state.foldAt(index);
+      DocRange doc = state.docAtLine(index);
+      int end = fold != null
+          ? fold.last()
+          : doc != null && state.isDocRendered(doc) ? doc.lastLine() : index;
+      boolean under = (i == 0 || y >= cell.y())
+          && (i + 1 == cells.size() || y < cells.get(i + 1).y());
+      if (under || index == anchor) {
+        first = Math.min(first, index);
+        last = Math.max(last, end);
+      }
+    }
+    return new Lines(first, last);
+  }
+
+  private static int cellLine(El cell) {
+    return Integer.parseInt(cell.key().substring("line-".length()));
   }
 
   /**
