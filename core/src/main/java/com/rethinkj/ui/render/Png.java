@@ -354,10 +354,13 @@ public final class Png {
     Inflater inflater = new Inflater();
     try {
       inflater.setInput(compressed);
-      byte[] raw = new byte[size];
+      byte[] raw = new byte[Math.min(size, 8192)];
       int read = 0;
       while (read < size && !inflater.finished()) {
-        int n = inflater.inflate(raw, read, size - read);
+        if (read == raw.length) {
+          raw = java.util.Arrays.copyOf(raw, (int) Math.min((long) size, raw.length * 2L));
+        }
+        int n = inflater.inflate(raw, read, raw.length - read);
         if (n == 0 && (inflater.needsInput() || inflater.needsDictionary())) {
           break;
         }
