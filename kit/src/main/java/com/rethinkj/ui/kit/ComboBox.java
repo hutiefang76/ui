@@ -149,7 +149,9 @@ public final class ComboBox {
     state.list.current = selected; // highlighted while nothing is typed
     List<FilterList.Entry> entries = entries(state, choices, selected, i -> {
       state.close();
-      onSelect.accept(i);
+      if (i != selected) {
+        onSelect.accept(i);
+      }
     });
     El field = TextField.textField(state.list.query, text, v -> state.list.typed(v, true))
         .label(text);
@@ -321,7 +323,9 @@ public final class ComboBox {
     // The handlers of the entries go through the state, which holds the handler of this build.
     state.choose = i -> {
       state.close();
-      onSelect.accept(i);
+      if (i != selected) {
+        onSelect.accept(i);
+      }
     };
     if (items != state.choices || selected != state.chosen || state.entries == null) {
       List<FilterList.Entry> entries = new ArrayList<>(items.size());

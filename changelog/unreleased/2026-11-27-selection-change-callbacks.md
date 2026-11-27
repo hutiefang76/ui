@@ -1,0 +1,1 @@
+- Select and ComboBox notify selection handlers only when the chosen value changes.

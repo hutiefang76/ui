@@ -1,6 +1,7 @@
 package com.rethinkj.ui.kit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -61,6 +62,53 @@ class TypedChoicesTest {
 
   private static boolean key(El e, String name) {
     return e.onKey().test(new Key(name));
+  }
+
+  @Test
+  void aSelectReportsOnlyChangedChoices() {
+    Menu.State menu = new Menu.State();
+    menu.open();
+    El select = Select.select(LEVELS, Level.MEDIUM, l -> l.label, menu, told::add);
+    press(select.overlays().getFirst(), "Medium");
+    assertEquals(List.of(), told);
+    assertFalse(menu.isOpen());
+
+    menu = new Menu.State();
+    menu.open();
+    select = Select.select(LEVELS, Level.MEDIUM, l -> l.label, menu, told::add);
+    press(select.overlays().getFirst(), "High");
+    assertEquals(List.of(Level.HIGH), told);
+    assertFalse(menu.isOpen());
+  }
+
+  @Test
+  void aTypedComboBoxReportsOnlyChangedChoices() {
+    for (boolean itemVariant : new boolean[] {false, true}) {
+      List<Level> values = LEVELS;
+      ComboBox.State state = new ComboBox.State();
+      state.open();
+      if (itemVariant) {
+        ComboBox.items(values, Level.MEDIUM, l -> ComboBox.item(l.label), state, told::add);
+      } else {
+        ComboBox.comboBox(values, Level.MEDIUM, l -> l.label, state, told::add);
+      }
+      state.entries.get(1).onChoose().run();
+      assertEquals(List.of(), told);
+      assertFalse(state.isOpen());
+      told.clear();
+
+      state = new ComboBox.State();
+      state.open();
+      if (itemVariant) {
+        ComboBox.items(values, Level.MEDIUM, l -> ComboBox.item(l.label), state, told::add);
+      } else {
+        ComboBox.comboBox(values, Level.MEDIUM, l -> l.label, state, told::add);
+      }
+      state.entries.get(2).onChoose().run();
+      assertEquals(List.of(Level.HIGH), told);
+      assertFalse(state.isOpen());
+      told.clear();
+    }
   }
 
   @Test
