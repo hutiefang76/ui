@@ -1,0 +1,1 @@
+- `App.edit` no longer adds an empty undo step or clears redo when `maxLength` rejects all inserted text without replacing any text.
