@@ -5,6 +5,8 @@ description: Searchable dropdown with fuzzy filtering, free-text suggestions, an
 
 `ComboBox.comboBox` shows the current choice and a chevron when closed, and opens a searchable dropdown with fuzzy filtering when clicked or typed into. It looks like a [Select](/docs/components/select) in every state, also while you type into it, so the two sit side by side in a form or a toolbar. Use it when there are many choices or when users know the name they want.
 
+The indexed and typed overloads call `onSelect` only when the choice changes. Choosing the current choice still closes the popup.
+
 - `ComboBox.free` is an editable text field with autocomplete suggestions (any typed text is accepted).
 - `ComboBox.items` displays choices with icons, images, custom leading elements, secondary detail text, and per-item fonts.
 

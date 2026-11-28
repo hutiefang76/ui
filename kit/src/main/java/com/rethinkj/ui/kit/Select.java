@@ -117,8 +117,8 @@ public final class Select {
     List<Menu.Item> items = new ArrayList<>();
     for (int i = 0; i < choices.size(); i++) {
       int choice = i;
-      Menu.Item item =
-          Menu.item(choices.get(i), () -> onSelect.accept(choice)).checked(i == selected);
+      Menu.Item item = Menu.item(choices.get(i), Radio.choose(onSelect, selected, choice))
+          .checked(i == selected);
       Icon icon = icons != null && i < icons.size() ? icons.get(i) : null;
       if (icon != null) {
         item = item.leading(() -> Icon.icon(icon, Icon.Variant.MUTED));
