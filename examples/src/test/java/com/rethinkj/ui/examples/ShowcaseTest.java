@@ -56,8 +56,14 @@ class ShowcaseTest {
     Files.createDirectories(fixture);
     App<Showcase> app = Showcase.app(Look.DARK);
 
-    String readyScript = "size 1280 900 scale 1\nframe\n"
-        + "press role=option label=\"Progress\"\nframe\nadvance 1\nframe";
+    String readyScript = """
+        size 1280 900 scale 1
+        frame
+        press role=option label="Progress"
+        frame
+        advance 1
+        frame
+        """;
     Script.run(readyScript, app, fixture);
     int readyWidth = startButtonWidth(app.tree().dump());
 
