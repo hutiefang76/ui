@@ -130,6 +130,39 @@ class HighlightTest {
   }
 
   @Test
+  void changingTheHighlighterForgetsAnOffscreenWidestLine() {
+    Highlighter wide = (line, state, out) -> {
+      out.font(0, line.length(), Font.monoBold());
+      return null;
+    };
+    Highlighter narrow = (line, state, out) -> {
+      out.font(0, line.length(), Font.sans());
+      return null;
+    };
+    for (Highlighter replacement : new Highlighter[] {narrow, null}) {
+      Object[] highlightKey = {"wide"};
+      Highlighter[] highlighter = {wide};
+      String text = "i".repeat(60) + "\n" + "x\n".repeat(100) + "x";
+      App<Model> app =
+          Areas.start(text, f -> f.font(Font.sans()).highlight(highlightKey[0], highlighter[0]), 1);
+      focus(app);
+      double widest = field(app).text().extentWidth(0);
+      assertTrue(widest > 200);
+      key(app, "End", Key.CONTROL);
+      assertTrue(field(app).text().scrollY() > 0);
+      assertEquals(widest, field(app).text().extentWidth(0));
+      if (replacement != null) {
+        highlightKey[0] = "narrow";
+      }
+      highlighter[0] = replacement;
+      app.focus(null);
+      app.frame();
+      assertTrue(field(app).text().scrollY() > 0);
+      assertEquals(Font.sans().shape("x", 14, 1).width(), field(app).text().extentWidth(0), 0.01);
+    }
+  }
+
+  @Test
   void rangesFollowWrapsAndTabs() {
     // 29 characters of 8.5 pixels in a content box of 192 (22 chars): wraps before "eeee".
     App<Model> app = area(

@@ -406,6 +406,9 @@ public final class Text implements Measure {
       Object highlighting,
       Object hints) {}
 
+  /** Widths of unwrapped lines also depend on the fonts selected by highlighting. */
+  private record Measuring(Wrapping wrapping, Object highlighting) {}
+
   /**
    * The lines of a multi-line field shaped so far, by index, and the sizes measured from them by
    * width: kept with the field's lines, which its editor keeps across trees while the string stays,
@@ -3040,8 +3043,9 @@ public final class Text implements Measure {
   private void wrapping() {
     if (!wraps) {
       shownLines.wrap(null, 1);
-      shownLines.measuredFor(
-          new Wrapping(0, font(), size, scale, List.of(features), tabSize, systemFonts));
+      shownLines.measuredFor(new Measuring(
+          new Wrapping(0, font(), size, scale, List.of(features), tabSize, systemFonts),
+          highlighter == null || placeholderShown ? NO_HIGHLIGHTING : highlightKey));
       return;
     }
     if (!laidOut) {
