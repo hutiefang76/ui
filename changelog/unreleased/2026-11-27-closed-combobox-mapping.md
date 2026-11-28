@@ -1,0 +1,1 @@
+- Typed ComboBox forms map only the current value while closed or disabled, instead of mapping every choice.

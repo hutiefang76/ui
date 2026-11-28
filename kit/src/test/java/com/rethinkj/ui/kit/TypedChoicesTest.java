@@ -9,7 +9,9 @@ import com.rethinkj.ui.El;
 import com.rethinkj.ui.Key;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -212,5 +214,79 @@ class TypedChoicesTest {
     assertTrue(key(NavList.navList(pages, null, Page::item, p -> p.group, told::add), "End"));
     assertEquals(Page.ABOUT, told.getLast(), "from none, End selects the last");
     assertNull(NavList.navList(pages, Page.ABOUT, Page::item, null).onKey());
+  }
+
+  @Test
+  void aClosedComboBoxMapsOnlyItsCurrentValue() {
+    List<Level> values = new ArrayList<>(List.of(Level.LOW, Level.LOW, Level.HIGH));
+    values.add(null);
+    for (boolean itemVariant : new boolean[] {false, true}) {
+      for (boolean enabled : new boolean[] {true, false}) {
+        for (Level selected : new Level[] {Level.HIGH, null, Level.MEDIUM}) {
+          int[] count = {0};
+          Function<Level, String> text = v -> {
+            count[0]++;
+            return v == null ? "None" : v.label;
+          };
+          ComboBox.State state = new ComboBox.State();
+          if (!enabled) {
+            state.open();
+          }
+          El combo = itemVariant
+              ? ComboBox.items(
+                  values,
+                  selected,
+                  v -> ComboBox.item(text.apply(v)),
+                  state,
+                  enabled ? told::add : null)
+              : ComboBox.comboBox(values, selected, text, state, enabled ? told::add : null);
+          assertFalse(state.isOpen(), "the popup is closed after building enabled=" + enabled);
+          int expectedCalls;
+          String expectedLabel;
+          if (selected == Level.MEDIUM) {
+            expectedCalls = 0;
+            expectedLabel = "";
+          } else if (selected == Level.HIGH) {
+            expectedCalls = 1;
+            expectedLabel = "High";
+          } else {
+            expectedCalls = 1;
+            expectedLabel = "None";
+          }
+          assertEquals(
+              expectedCalls,
+              count[0],
+              "mapper calls for " + selected + " enabled=" + enabled + " item=" + itemVariant);
+          assertEquals(expectedLabel, combo.label());
+        }
+      }
+    }
+  }
+
+  @Test
+  void aComboBoxRefreshesItsChoicesAfterAClosedBuild() {
+    for (boolean itemVariant : new boolean[] {false, true}) {
+      List<Schema> schemas =
+          new ArrayList<>(List.of(new Schema("orders", "alice"), new Schema("users", "bob")));
+      told.clear();
+      ComboBox.State state = new ComboBox.State();
+      Supplier<El> build = () -> itemVariant
+          ? ComboBox.items(schemas, schemas.get(0), s -> ComboBox.item(s.name()), state, told::add)
+          : ComboBox.comboBox(schemas, schemas.get(0), s -> s.name(), state, told::add);
+      state.open();
+      build.get();
+      state.close();
+      schemas.set(1, new Schema("invoices", "bob"));
+      build.get();
+      state.open();
+      build.get();
+      List<FilterList.Entry> entries = state.entries;
+      assertEquals(2, entries.size());
+      assertEquals("orders", entries.get(0).text());
+      assertEquals("invoices", entries.get(1).text());
+      entries.get(1).onChoose().run();
+      assertEquals(List.of(new Schema("invoices", "bob")), told);
+      assertFalse(state.isOpen());
+    }
   }
 }

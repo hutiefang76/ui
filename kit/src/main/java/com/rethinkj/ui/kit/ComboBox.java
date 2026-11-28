@@ -201,12 +201,13 @@ public final class ComboBox {
    *     value -> state.schema = value)
    * }</pre>
    *
-   * <p>The texts are made in every build, one call of {@code text} per value, and while they are
+   * <p>While closed or disabled, only the selected value's text is made, or none if the value is
+   * absent. While open, texts are made for all distinct values in every build. While they are
    * equal to the last build's, the list of the last build goes on, so that the list keeps what it
    * filtered, as it does for the same list of texts.
    *
-   * @param selected the current value, found by {@code equals}; null, or a value not among them,
-   *     for none
+   * @param selected the current value, found by {@code equals}, including null if present; a
+   *     value not among them selects nothing
    * @param text the text a value shows, and what a typed text is matched against
    * @param onSelect told the value chosen; null disables the combo box
    */
@@ -217,6 +218,15 @@ public final class ComboBox {
       Function<? super T, String> text,
       State state,
       Consumer<? super T> onSelect) {
+    if (!state.open || onSelect == null) {
+      int index = Choices.index(values, selected);
+      List<T> current = index < 0 ? List.of() : values.subList(index, index + 1);
+      return comboBox(
+          Choices.texts(current, text),
+          current.isEmpty() ? -1 : 0,
+          state,
+          Choices.handler(current, onSelect));
+    }
     values = Choices.distinct(values);
     List<String> texts = Choices.texts(values, text);
     if (texts.equals(state.typed)) {
@@ -382,13 +392,14 @@ public final class ComboBox {
    *     state.productBox, value -> state.product = value)
    * }</pre>
    *
-   * <p>The items are made in every build, one call of {@code item} per value, and while the values
+   * <p>While closed or disabled, only the selected value's item is made, or none if the value is
+   * absent. While open, items are made for all distinct values in every build. While the values
    * are equal to the last build's and so are the items' texts and details, the items of the last
    * build go on, so that the list keeps what it filtered; what stands before a text and its font
    * are taken to follow from the value.
    *
-   * @param selected the current value, found by {@code equals}; null, or a value not among them,
-   *     for none
+   * @param selected the current value, found by {@code equals}, including null if present; a
+   *     value not among them selects nothing
    * @param item the item a value shows, such as {@code
    *     value -> ComboBox.item(value.name()).icon(...)}
    * @param onSelect told the value chosen; null disables the combo box
@@ -400,6 +411,15 @@ public final class ComboBox {
       Function<? super T, Item> item,
       State state,
       Consumer<? super T> onSelect) {
+    if (!state.open || onSelect == null) {
+      int index = Choices.index(values, selected);
+      List<T> current = index < 0 ? List.of() : values.subList(index, index + 1);
+      List<Item> shown = new ArrayList<>(current.size());
+      for (T value : current) {
+        shown.add(item.apply(value));
+      }
+      return items(shown, current.isEmpty() ? -1 : 0, state, Choices.handler(current, onSelect));
+    }
     values = Choices.distinct(values);
     List<Item> items = new ArrayList<>(values.size());
     for (T v : values) {
