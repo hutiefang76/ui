@@ -1,0 +1,1 @@
+- Unwrapped text fields and code editors discard line-width measurements when highlighting changes, so fonts from a previous highlighter no longer keep the horizontal scroll range too wide.
