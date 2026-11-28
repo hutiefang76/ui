@@ -751,7 +751,7 @@ public final class Workbench implements Tree.Model<Workbench.Node> {
       return null;
     }
     List<FilterList.Entry> commands = new ArrayList<>(CommandPalette.commands(menus(frame)));
-    commands.add(FilterList.entry("Change theme…", () -> changeTheme(palette)));
+    commands.addFirst(FilterList.entry("Change theme…", () -> changeTheme(palette)));
     return CommandPalette.palette(
         palette,
         commands,

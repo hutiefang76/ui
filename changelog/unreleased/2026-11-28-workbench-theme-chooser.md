@@ -1,0 +1,1 @@
+- Workbench’s command palette opens the theme chooser when `theme` is typed and Enter is pressed, instead of immediately selecting the dark theme.
