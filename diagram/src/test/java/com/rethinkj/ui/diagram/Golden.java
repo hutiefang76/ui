@@ -82,6 +82,23 @@ public final class Golden {
     Files.createDirectories(FAILED);
     Files.write(FAILED.resolve(name + ".expected.png"), Png.encode(expected));
     Files.write(FAILED.resolve(name + ".actual.png"), Png.encode(pixels));
-    fail("Image of '" + name + "' changed. See " + FAILED.toAbsolutePath());
+    String difference = expected.width() + "x" + expected.height() + " stored, " + pixels.width()
+        + "x" + pixels.height() + " rendered";
+    if (expected.width() == pixels.width() && expected.height() == pixels.height()) {
+      byte[] diff = new byte[pixels.rgba().length];
+      int count = 0;
+      for (int i = 0; i < diff.length; i += 4) {
+        if (!Arrays.equals(expected.rgba(), i, i + 4, pixels.rgba(), i, i + 4)) {
+          diff[i] = (byte) 0xFF;
+          diff[i + 3] = (byte) 0xFF;
+          count++;
+        }
+      }
+      Files.write(
+          FAILED.resolve(name + ".diff.png"),
+          Png.encode(new Pixels(pixels.width(), pixels.height(), diff)));
+      difference = count + " pixels differ";
+    }
+    fail("Image of '" + name + "' changed: " + difference + ". See " + FAILED.toAbsolutePath());
   }
 }
