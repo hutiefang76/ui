@@ -844,24 +844,13 @@ public final class FilterList {
       name.font(custom);
     }
     name.style().minYields = true;
-    int[] at = shown.query().isEmpty() ? null : Fuzzy.positions(shown.query(), entry.text());
-    if (at != null && at.length > 0) {
-      name.highlight(shown.query(), (line, before, spans) -> {
-        for (int k = 0; k < at.length; k++) {
-          int end = k;
-          while (end + 1 < at.length && at[end + 1] == at[end] + 1) {
-            end++;
-          }
-          if (custom != null) {
-            spans.background(at[k], at[end] + 1, theme.code().match());
-          } else {
-            spans.font(at[k], at[end] + 1, strong);
-          }
-          k = end;
-        }
-        return null;
-      });
-    }
+    // A name in its own typeface keeps it: the matches get a background instead of a weight.
+    highlightMatches(
+        name,
+        shown.query(),
+        entry.text(),
+        custom == null ? strong : null,
+        theme.code().match());
     El content = PassiveContent.row(
         theme,
         PassiveContent.flexibleLeading(theme, leading),
@@ -882,6 +871,31 @@ public final class FilterList {
         .child(content);
     return Tooltip.whenShortened(
         option, entry.detail() == null ? entry.text() : entry.text() + " — " + entry.detail());
+  }
+
+  /**
+   * Marks the characters of {@code text} that match {@code query}: in {@code strong}, or where it is
+   * null, on {@code background}.
+   */
+  static void highlightMatches(El name, String query, String text, Font strong, int background) {
+    int[] at = query.isEmpty() ? null : Fuzzy.positions(query, text);
+    if (at != null && at.length > 0) {
+      name.highlight(query, (line, before, spans) -> {
+        for (int k = 0; k < at.length; k++) {
+          int end = k;
+          while (end + 1 < at.length && at[end + 1] == at[end] + 1) {
+            end++;
+          }
+          if (strong == null) {
+            spans.background(at[k], at[end] + 1, background);
+          } else {
+            spans.font(at[k], at[end] + 1, strong);
+          }
+          k = end;
+        }
+        return null;
+      });
+    }
   }
 
   /**
