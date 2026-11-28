@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.rethinkj.ui.App;
 import com.rethinkj.ui.El;
 import com.rethinkj.ui.Script;
+import com.rethinkj.ui.kit.CommandPalette;
 import com.rethinkj.ui.kit.Split;
 import com.rethinkj.ui.kit.TabGroups;
 import com.rethinkj.ui.kit.Theme;
@@ -92,6 +93,25 @@ class WorkbenchTest {
     assertEquals(
         "customers", s.groups.main().active().activeTab().title(), "the best match opened");
     assertFalse(s.palette(s.groups.main()).isOpen());
+  }
+
+  /** Typing "theme" and pressing Enter opens the chooser instead of directly selecting Dark. */
+  @Test
+  void themeQueryOpensTheChooserInsteadOfSelectingDark() throws IOException {
+    App<Workbench> app = started();
+    Workbench s = app.state();
+    Script.run(
+        "size 1000 600\nframe\nkey P control shift\nframe\ntype \"theme\"\nframe\nkey Enter\nframe",
+        app,
+        out);
+    CommandPalette.State palette = s.palette(s.groups.main());
+    assertTrue(palette.isOpen(), "palette remains open to choose a theme");
+    String dump = app.tree().dump();
+    assertTrue(dump.contains("role=option label=\"Dark\""), "Dark option is offered");
+    assertTrue(dump.contains("role=option label=\"Light\""), "Light option is offered");
+    Script.run("key ArrowDown\nframe\nkey Enter\nframe", app, out);
+    assertFalse(palette.isOpen());
+    assertFalse(s.dark);
   }
 
   @Test
