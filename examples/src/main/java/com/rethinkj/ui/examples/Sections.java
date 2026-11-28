@@ -1266,11 +1266,12 @@ final class Sections {
             .align(Style.Align.CENTER)
             .child(Button.button(
                     PRIMARY,
-                    state.downloading ? "Downloading" : "Download",
+                    "Download",
                     state::startDownload,
                     Button.options()
                         .icon(Symbol.ARROW_DOWNLOAD)
-                        .state(state.downloading ? Button.State.BUSY : Button.State.READY))
+                        .state(state.downloading ? Button.State.BUSY : Button.State.READY)
+                        .busyText("Downloading"))
                 .key("start"))
             .child(button(SECONDARY, "Let it fail", state.downloading ? state::failDownload : null)
                 .key("fail")));

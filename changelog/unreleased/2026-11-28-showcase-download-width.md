@@ -1,0 +1,1 @@
+- Showcase’s Progress download button keeps the same width while showing its busy text.
